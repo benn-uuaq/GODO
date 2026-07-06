@@ -1,0 +1,27 @@
+[11:37:29.120] DB_PATH :
+[11:37:29.121] D:\RND_WORK\Godo\GoDo\DB\godo_system.db
+[11:37:31.569] [INFO] 시료 비커 모드 선택됨
+[11:37:31.569] [INFO] 로봇 제어 변수 초기화 완료 (오프셋 변수 제외)
+[11:37:33.456] [VISION] 카메라 네트워크 연결 시도 중 (192.168.1.11)...
+[11:37:33.456] [VISION] 카메라 연결 성공.
+[11:37:33.456] [System] 백그라운드 자동 연결 시작...
+[11:37:33.458] [DEBUG] 비전 백그라운드 상주 스레드 연결 성공 (통신 간섭 없음)
+[11:37:33.458] [System] 외부 통신 TCP 서버 시작됨 (포트: 5000)...
+[11:37:33.512] Connected to 192.168.1.101 on port 29999
+[11:37:33.512] Connected to 192.168.1.101 on port 30001
+[11:37:33.512] [PC Modbus Client] 로봇 서버(192.168.1.101:502, ID:255)에 코일 통신 연결 시도 중...
+[11:37:33.546] [SYSTEM] 로봇 원격(Remote) 제어 권한 감지 -> 자동 재연결 시도
+[11:37:33.546] [PC Modbus Client] 접속 종료
+[11:37:33.546] [PC Modbus Client] 로봇 서버 접속 성공!
+[11:37:33.546] [INFO] 로봇 연결 성공 (192.168.1.101)
+[11:37:33.551] [MODBUS WRITE ERROR] 'NoneType' object has no attribute 'write_single_register'
+[11:37:33.551] [MODBUS WRITE ERROR] 'NoneType' object has no attribute 'write_single_register'
+[11:37:33.551] [MODBUS WRITE ERROR] 'NoneType' object has no attribute 'write_single_register'
+[11:37:33.553] [MODBUS WRITE ERROR] 'NoneType' object has no attribute 'write_single_register'
+[11:37:33.553] [INFO] '1L_cylinder' 오프셋 전송 완료: Center(계산)=65, Height(입력)=156, Deep(입력)=0, Sensing(입력)=300
+[11:37:33.553] Connected to 192.168.1.101 on port 29999
+[11:37:33.577] Connected to 192.168.1.101 on port 30001
+[11:37:33.579] [PC Modbus Client] 로봇 서버(192.168.1.101:502, ID:255)에 코일 통신 연결 시도 중...
+[11:37:33.579] [PC Modbus Client] 로봇 서버 접속 성공!
+[11:37:33.579] [INFO] 로봇 연결 성공 (192.168.1.101)
+[11:37:33.789] [INFO] '1L_cylinder' 오프셋 전송 완료: Center(계산)=65, Height(입력)=156, Deep(입력)=0, Sensing(입력)=300

@@ -1,0 +1,57 @@
+[11:34:49.245] DB_PATH :
+[11:34:49.248] D:\RND_WORK\Godo\GoDo\DB\godo_system.db
+[11:35:03.704] [INFO] 시료 비커 모드 선택됨
+[11:35:03.704] [INFO] 로봇 제어 변수 초기화 완료 (오프셋 변수 제외)
+[11:35:05.672] [VISION] 카메라 네트워크 연결 시도 중 (192.168.1.11)...
+[11:35:05.673] [VISION FATAL] 카메라 연결 실패: VendorTCPClient: Connect to server failed! addr=192.168.1.11, port=8090, err=socket is not ready & timeout
+[11:35:05.674] [DEBUG] 비전 카메라 연결 실패
+[11:35:05.722] [System] 백그라운드 자동 연결 시작...
+[11:35:05.722] [System] 외부 통신 TCP 서버 시작됨 (포트: 5000)...
+[11:35:06.233] Error connecting to 192.168.1.101 on port 29999: timed out
+[11:35:06.357] Error sending command: timed out
+[11:35:06.744] Error connecting to 192.168.1.101 on port 30001: timed out
+[11:35:06.746] [PC Modbus Client] 로봇 서버(192.168.1.101:502, ID:255)에 코일 통신 연결 시도 중...
+[11:35:07.195] Error sending command: timed out
+[11:35:07.763] [PC Modbus Client] 로봇 서버 접속 실패
+[11:35:07.765] [ERROR] 로봇 연결 실패: 29999 포트 연결 실패
+[11:35:11.397] Error sending command: timed out
+[11:35:14.983] Error sending command: timed out
+[11:35:14.984] Error sending command: timed out
+[11:35:18.601] Error sending command: timed out
+[11:35:18.603] Error sending command: timed out
+[11:35:22.235] Error sending command: timed out
+[11:35:22.235] Error sending command: timed out
+[11:35:25.818] Error sending command: timed out
+[11:35:25.820] Error sending command: timed out
+[11:35:29.430] Error sending command: timed out
+[11:35:29.431] Error sending command: timed out
+[11:35:33.055] Error sending command: timed out
+[11:35:33.057] Error sending command: timed out
+[11:35:36.664] Error sending command: timed out
+[11:35:36.665] Error sending command: timed out
+[11:35:40.300] Error sending command: timed out
+[11:35:40.302] Error sending command: timed out
+[11:35:43.926] Error sending command: timed out
+[11:35:43.928] Error sending command: timed out
+[11:35:47.533] Error sending command: timed out
+[11:35:47.535] Error sending command: timed out
+[11:35:51.139] Error sending command: timed out
+[11:35:51.140] Error sending command: timed out
+[11:35:54.759] Error sending command: timed out
+[11:35:54.759] Error sending command: timed out
+[11:35:58.367] Error sending command: timed out
+[11:35:58.367] Error sending command: timed out
+[11:36:01.969] Error sending command: timed out
+[11:36:01.969] Error sending command: timed out
+[11:36:05.596] Error sending command: timed out
+[11:36:05.596] Error sending command: timed out
+[11:36:09.230] Error sending command: timed out
+[11:36:09.230] Error sending command: timed out
+[11:36:12.817] Error sending command: timed out
+[11:36:12.819] Error sending command: timed out
+[11:36:15.433] Error sending command: timed out
+[11:36:15.433] Error sending command: timed out
+[11:36:16.038] Error sending command: timed out
+[11:36:16.038] Error sending command: timed out
+[11:36:16.591] Error sending command: timed out
+[11:36:16.591] Error sending command: timed out

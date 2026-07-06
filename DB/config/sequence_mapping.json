@@ -1,0 +1,33 @@
+{
+  "COMMON": {
+    "home_pose_btn": ["J_home"]
+  },
+  "CELL_1": {
+    "waypoint_pose_btn": ["J_jig1_waypoint"],
+    "pose_1_btn": ["J_jig1_waypoint", "L_jig1_center"],
+    "pose_2_btn": ["J_jig1_waypoint", "L_jig1_lcc2"],
+    "pose_3_btn": ["J_jig1_waypoint", "L_jig1_rcc2"],
+    "pose_4_btn": ["J_jig1_waypoint", "L_jig1_rcc3"],
+    "pose_5_btn": ["J_jig1_waypoint", "L_jig1_lcc3"],
+    "pose_6_btn": ["J_jig1_waypoint", "L_jig1_lcc4"],
+    "pose_7_btn": ["J_jig1_waypoint", "L_jig1_rcc4"],
+    "pose_8_btn": ["J_jig1_waypoint", "L_jig1_rcc1"],
+    "pose_9_btn": ["J_jig1_waypoint", "L_jig1_lcc1"],
+    "pose_10_btn": ["J_jig1_waypoint", "L_abv_jig1_L", "L_jig1_L"],
+    "pose_11_btn": ["J_jig1_waypoint", "L_abv_jig1_R", "L_jig1_R"]
+  },
+  "CELL_2": {
+    "waypoint_pose_btn": ["J_jig2_waypoint"],
+    "pose_1_btn": ["J_jig2_waypoint", "L_jig2_center"],
+    "pose_2_btn": ["J_jig2_waypoint", "L_jig2_lcc2"],
+    "pose_3_btn": ["J_jig2_waypoint", "L_jig2_rcc2"],
+    "pose_4_btn": ["J_jig2_waypoint", "L_jig2_rcc3"],
+    "pose_5_btn": ["J_jig2_waypoint", "L_jig2_lcc3"],
+    "pose_6_btn": ["J_jig2_waypoint", "L_jig2_lcc4"],
+    "pose_7_btn": ["J_jig2_waypoint", "L_jig2_rcc4"],
+    "pose_8_btn": ["J_jig2_waypoint", "L_jig2_rcc1"],
+    "pose_9_btn": ["J_jig2_waypoint", "L_jig2_lcc1"],
+    "pose_10_btn": ["J_jig2_waypoint", "L_abv_jig2_L", "L_jig2_L"],
+    "pose_11_btn": ["J_jig2_waypoint", "L_abv_jig2_R", "L_jig2_R"]
+  }
+}

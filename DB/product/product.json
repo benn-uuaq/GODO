@@ -1,0 +1,54 @@
+{
+    "calibration": {
+        "1L_marineli": {
+            "target_mm": 150.0,
+            "anchor_mm": 150.0,
+            "color": "white",
+            "area1": {
+                "cx": 1958.0,
+                "cy": 1076.0,
+                "depth": 0.4410430302207949
+            },
+            "area2": {
+                "cx": 1902.0,
+                "cy": 1104.0,
+                "depth": 0.49399968878420625
+            }
+        },
+        "1L_cylinder": {
+            "target_mm": 110.0,
+            "anchor_mm": 110.0,
+            "color": "white",
+            "area1": {
+                "cx": 1970.0,
+                "cy": 1100.0,
+                "depth": 0.3201480633922554
+            },
+            "area2": {
+                "cx": 1892.0,
+                "cy": 1108.0,
+                "depth": 0.3780486704679914
+            }
+        }
+    },
+    "beaker": {
+        "1L_marineli": {
+            "target_mm": 150.0,
+            "anchor_mm": 150.0,
+            "color": "white",
+            "jig_center_offs": 89,
+            "jig_height_offs": 143,
+            "cell_deep_offs": 71,
+            "sensing_offs": 300
+        },
+        "1L_cylinder": {
+            "target_mm": 110.0,
+            "anchor_mm": 110.0,
+            "color": "white",
+            "jig_center_offs": 65,
+            "jig_height_offs": 156,
+            "cell_deep_offs": 0,
+            "sensing_offs": 300
+        }
+    }
+}
