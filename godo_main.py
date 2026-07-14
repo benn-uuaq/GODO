@@ -83,6 +83,19 @@ class VisionHardwareWorker(threading.Thread):
         self.last_img = None # ★ 촬영된 원본 이미지를 캐싱할 변수
 
     def run(self):
+        
+        old_cwd = os.getcwd() # 기존 작업 디렉토리 백업
+        try:
+            # 우리가 원하는 오르벡 로그 타겟 경로 생성 (DB/Log/Orrbec)
+            orbbec_log_dir = DB_PATH / "Log" / "Orrbec"
+            orbbec_log_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 카메라가 켜지기 직전 현재 디렉토리를 해당 폴더로 변경
+            os.chdir(str(orbbec_log_dir))
+            print(f"[VISION CWD] 오르벡 로그 경로 강제 지정: {orbbec_log_dir}")
+        except Exception as e:
+            print(f"[VISION CWD ERROR] 로그 경로 변경 실패: {e}")
+            
         from VISION.vision_main import VisionCore
         self.core = VisionCore(config_path=self.config_path, product_path=self.product_path)
 
@@ -94,6 +107,12 @@ class VisionHardwareWorker(threading.Thread):
         self.core.on_image_ready = _on_image
         
         is_connected = self.core.connect_camera()
+        
+        try:
+            os.chdir(old_cwd)
+        except Exception:
+            pass
+
         self.res_queue.put({"type": "status", "ready": self.core.device is not None})
 
         while True:

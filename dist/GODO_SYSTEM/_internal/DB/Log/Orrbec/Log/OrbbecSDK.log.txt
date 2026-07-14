@@ -1,0 +1,2 @@
+[07/14 10:47:17.000762][error][36040][FemtoMegaDevice.cpp:947] Set device communication type to ethernet mode failed!
+[07/14 10:47:19.005513][error][36040][FemtoMegaDevice.cpp:964] Get device in recovery mode failed!
