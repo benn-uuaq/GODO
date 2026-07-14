@@ -18,3 +18,7 @@
 [05/04 13:45:43.763886][error][27636][FemtoMegaDevice.cpp:964] Get device in recovery mode failed!
 [06/01 11:34:57.616863][error][23308][FemtoMegaDevice.cpp:947] Set device communication type to ethernet mode failed!
 [06/01 11:34:59.657378][error][23308][FemtoMegaDevice.cpp:964] Get device in recovery mode failed!
+[07/14 10:22:59.635406][error][32680][FemtoMegaDevice.cpp:947] Set device communication type to ethernet mode failed!
+[07/14 10:23:01.638093][error][32680][FemtoMegaDevice.cpp:964] Get device in recovery mode failed!
+[07/14 10:28:04.046320][error][16584][FemtoMegaDevice.cpp:947] Set device communication type to ethernet mode failed!
+[07/14 10:28:06.053900][error][16584][FemtoMegaDevice.cpp:964] Get device in recovery mode failed!

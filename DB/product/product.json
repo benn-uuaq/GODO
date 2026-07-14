@@ -39,7 +39,8 @@
             "jig_center_offs": 89,
             "jig_height_offs": 143,
             "cell_deep_offs": 71,
-            "sensing_offs": 300
+            "sensing_offs": 300,
+            "grab_offs": 0
         },
         "1L_cylinder": {
             "target_mm": 110.0,
@@ -48,7 +49,8 @@
             "jig_center_offs": 65,
             "jig_height_offs": 156,
             "cell_deep_offs": 0,
-            "sensing_offs": 300
+            "sensing_offs": 300,
+            "grab_offs": 0
         }
     }
 }

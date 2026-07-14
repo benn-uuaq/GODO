@@ -748,7 +748,14 @@ class WorkSetupDialog(QDialog):
         new_count = len(target_points)
         points_str = ", ".join(map(str, target_points))
         
-        msg_text = f"<b>셀 {self.cell_num} ({work_mode})</b><br><br>비커: <b>{selected_beaker}</b><br>작업 포인트: <b>{points_str}</b><br>총 수량: <b>{new_count}개</b><br><br>해당 셀의 기록이 초기화됩니다. 진행하시겠습니까?"
+        msg_text = (
+            f"<b>셀 {self.cell_num} ({work_mode})</b><br><br>"
+            f"비커: <b>{selected_beaker}</b><br>"
+            f"작업 포인트: <b>{points_str}</b><br>"
+            f"총 수량: <b>{new_count}개</b><br><br>"
+            f"<span style='color: #FF3333;'><b>⚠️ 규격에 맞는 그리퍼 교체 여부를 반드시 확인하십시오.</b></span><br><br>"
+            f"해당 셀의 기록이 초기화됩니다. 진행하시겠습니까?"
+        )
         
         reply = self.main.show_message(
             title="작업 세팅 확인", 
@@ -1330,7 +1337,8 @@ class GODO(QMainWindow):
                 # ★ 2. 나머지는 사용자가 JSON에 입력한 값을 그대로 사용
                 jig_height = int(beaker_data.get("jig_height_offs", 0))
                 cell_deep = int(beaker_data.get("cell_deep_offs", 0))
-                sensing = int(beaker_data.get("sensing_offs", 0)) 
+                sensing = int(beaker_data.get("sensing_offs", 0))
+                grab = int(beaker_data.get("grab_offs", 0))
 
                 self.set_variable_with_ui("jig_center_offs", jig_center)
                 self.set_variable_with_ui("jig_height_offs", jig_height)
@@ -2694,21 +2702,6 @@ class GODO(QMainWindow):
                 self.ui.inspection_mode_btn.blockSignals(True)
                 self.ui.inspection_mode_btn.setChecked(True)
                 self.ui.inspection_mode_btn.blockSignals(False)
-
-    # def reset_all_robot_variables(self):
-    #     try:
-    #         config_path = ROBOT_PATH / "robot_var_config.json"
-    #         if config_path.exists():
-    #             with open(config_path, 'r', encoding='utf-8') as f:
-    #                 config_data = json.load(f)
-    #                 var_outputs = config_data.get("ROBOT_VAR_OUTPUT", {})
-    #                 io_outputs = config_data.get("ROBOT_IO_OUTPUT", {})
-    #             for addr_str, var_name in var_outputs.items():
-    #                 self.set_variable_with_ui(var_name, 0)
-    #             for addr_str, var_name in io_outputs.items():
-    #                 self.set_variable_with_ui(var_name, 0)
-    #         print("[INFO] 로봇 제어(OUTPUT) 변수 전체 0 초기화")
-    #     except Exception as e: print(f"[ERROR] 변수 초기화 실패: {e}")
     
     def reset_all_robot_variables(self):
         try:
@@ -2719,7 +2712,8 @@ class GODO(QMainWindow):
                     "jig_center_offs", 
                     "jig_height_offs", 
                     "cell_deep_offs", 
-                    "sensing_offs"
+                    "sensing_offs",
+                    "grab_offs"
                 ]
                 
                 with open(config_path, 'r', encoding='utf-8') as f:

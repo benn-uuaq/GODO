@@ -1,0 +1,29 @@
+[10:27:55.749] DB_PATH :
+[10:27:55.751] D:\RND_WORK\Godo\GoDo_260714\DB\godo_system.db
+[10:28:10.080] [INFO] 시료 비커 모드 선택됨
+[10:28:10.080] [INFO] 로봇 제어 변수 초기화 완료 (오프셋 변수 제외)
+[10:28:10.256] [VISION] 카메라 네트워크 연결 시도 중 (192.168.1.11)...
+[10:28:10.257] [VISION FATAL] 카메라 연결 실패: VendorTCPClient: Connect to server failed! addr=192.168.1.11, port=8090, err=socket is not ready & timeout
+[10:28:10.258] [System] 백그라운드 자동 연결 시작...
+[10:28:10.258] [DEBUG] 비전 카메라 연결 실패
+[10:28:10.283] [System] 외부 통신 TCP 서버 시작됨 (포트: 5000)...
+[10:28:10.760] Error connecting to 192.168.1.101 on port 29999: timed out
+[10:28:11.264] Error connecting to 192.168.1.101 on port 30001: timed out
+[10:28:11.265] [PC Modbus Client] 로봇 서버(192.168.1.101:502, ID:255)에 코일 통신 연결 시도 중...
+[10:28:12.087] Error sending command: timed out
+[10:28:12.271] [PC Modbus Client] 로봇 서버 접속 실패
+[10:28:12.272] [ERROR] 로봇 연결 실패: 29999 포트 연결 실패
+[10:28:15.879] Error sending command: timed out
+[10:28:19.497] Error sending command: timed out
+[10:28:19.498] Error sending command: timed out
+[10:28:23.106] Error sending command: timed out
+[10:28:23.107] Error sending command: timed out
+[10:28:26.720] Error sending command: timed out
+[10:28:26.722] Error sending command: timed out
+[10:28:30.334] Error sending command: timed out
+[10:28:30.335] Error sending command: timed out
+[10:28:33.932] Error sending command: timed out
+[10:28:33.933] Error sending command: timed out
+[10:28:33.938] [SYSTEM] 저장할 이전 작업 데이터가 없어 아카이브를 건너뜁니다.
+[10:28:37.551] Error sending command: timed out
+[10:28:37.554] Error sending command: timed out
