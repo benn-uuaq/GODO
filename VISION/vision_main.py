@@ -61,7 +61,8 @@ class VisionCore:
                 "MIN_DEPTH_DIFF_METERS": 0.015, "MIN_RADIUS_PX": 200, "MAX_RADIUS_PX": 800, "Z_OFFSET_METERS": -0.04,
                 "COLOR_WIDTH": 3840, "COLOR_HEIGHT": 2160, "COLOR_FPS": 5, "DEPTH_WIDTH": 1024, "DEPTH_HEIGHT": 1024,
                 "DEPTH_FPS": 5, "COLOR_AUTO_EXPOSURE": True, "COLOR_EXPOSURE_VAL": 150, "COLOR_AUTO_WB": True,
-                "COLOR_WB_VAL": 4600, "COLOR_WEIGHT_THRESHOLD": 20, "QR_SCALE_FACTOR": 1.0, 
+                "COLOR_WB_VAL": 4600, "COLOR_WEIGHT_THRESHOLD": 20, "QR_SCALE_FACTOR": 1.0,
+                "WHITE_MIN_BRIGHTNESS": 90, "WHITE_CLOSE_KSIZE": 25, "WHITE_CIRCULARITY_MIN": 0.65,
                 "SAVE_CYCLE": "1_month"
                 # ★ CALIB_DATA 기본값 제거됨
             }
@@ -74,7 +75,11 @@ class VisionCore:
         with open(self.vision_config_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             if "SAVE_CYCLE" not in data: data["SAVE_CYCLE"] = "1_month"
-            if "COLOR_WEIGHT_THRESHOLD" not in data: data["COLOR_WEIGHT_THRESHOLD"] = 20 
+            if "COLOR_WEIGHT_THRESHOLD" not in data: data["COLOR_WEIGHT_THRESHOLD"] = 20
+            # ★ white 보강 파라미터 (0 / 1 로 두면 기존 동작과 완전히 동일해짐)
+            if "WHITE_MIN_BRIGHTNESS" not in data: data["WHITE_MIN_BRIGHTNESS"] = 90
+            if "WHITE_CLOSE_KSIZE" not in data: data["WHITE_CLOSE_KSIZE"] = 25
+            if "WHITE_CIRCULARITY_MIN" not in data: data["WHITE_CIRCULARITY_MIN"] = 0.65
             return data
 
     # =========================================================================
@@ -119,7 +124,60 @@ class VisionCore:
             if not auto_wb: dev.set_int_property(OBPropertyID.OB_PROP_COLOR_WHITE_BALANCE_INT, self.v_config.get("COLOR_WB_VAL", 4600))
         except Exception: pass
 
-    def detect_circle_by_diff(self, color_img, depth_img, target_color="white"):
+    def _select_blob(self, contours, h, w, scale, qr_xy=None):
+        """
+        white 전용 blob 선택기 (반환: contour or None)
+
+        '가장 큰 blob' 은 사이트 조명이 바뀌면 지그 반사광에 밀린다.
+        실측 지표 (22mL_cylinder, 3840x2160):
+                        r_full   원형도   화면중심거리
+          뚜껑(정답)      63~71   0.86~0.87    31~50 px
+          지그 반사광    143~287   0.41~0.50   278~2203 px
+        -> 반지름/원형도로 거르고, QR 을 품은 blob 우선, 없으면 중앙 최근접.
+        """
+        min_full = self.v_config["MIN_RADIUS_PX"]
+        max_full = self.v_config["MAX_RADIUS_PX"]
+        r_lo, r_hi = min_full * 0.6, max_full * 1.5
+        circ_min = self.v_config.get("WHITE_CIRCULARITY_MIN", 0.65)
+
+        img_cx, img_cy = w / 2.0, h / 2.0
+        qx = qy = None
+        if qr_xy is not None:
+            qx, qy = qr_xy[0] * scale, qr_xy[1] * scale
+
+        cands = []
+        for cnt in contours:
+            m = np.zeros((h, w), np.uint8)
+            cv2.drawContours(m, [cnt], -1, 255, -1)
+            dt = cv2.distanceTransform(m, cv2.DIST_L2, 5)
+            _, inner, _, loc = cv2.minMaxLoc(dt)
+            _, _, ww, hh = cv2.boundingRect(cnt)
+            r_full = int(((inner + max(ww, hh) / 2.0) / 2.0) / scale)
+            if not (r_lo <= r_full <= r_hi):
+                continue
+
+            area = cv2.contourArea(cnt)
+            per = cv2.arcLength(cnt, True)
+            if per <= 0 or (4 * math.pi * area) / (per * per) < circ_min:
+                continue
+
+            d_ctr = math.hypot(loc[0] - img_cx, loc[1] - img_cy)
+            has_qr, d_qr = False, 1e9
+            if qx is not None:
+                d_qr = math.hypot(loc[0] - qx, loc[1] - qy)
+                has_qr = (cv2.pointPolygonTest(cnt, (float(qx), float(qy)), False) >= 0
+                          or d_qr <= max(inner, 10))
+            cands.append({"cnt": cnt, "d_ctr": d_ctr, "d_qr": d_qr, "has_qr": has_qr})
+
+        if not cands:
+            return None
+
+        qr_hits = [c for c in cands if c["has_qr"]]
+        if qr_hits:
+            return min(qr_hits, key=lambda c: c["d_qr"])["cnt"]
+        return min(cands, key=lambda c: c["d_ctr"])["cnt"]
+
+    def detect_circle_by_diff(self, color_img, depth_img, target_color="white", qr_xy=None):
         scale = 0.5
         # [원본 보존] 해상도 축소
         small_color = cv2.resize(color_img, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
@@ -143,8 +201,35 @@ class VisionCore:
 
         # 2. 이진화 및 노이즈 제거
         _, binary = cv2.threshold(np.clip(score_map, 0, 255).astype(np.uint8), color_threshold, 255, cv2.THRESH_BINARY)
+
+        # =================================================================
+        # ★ [white 전용 보강] 파란 랩/비닐 오검출 방지
+        # score_map(B-R)만으로는 '흰 뚜껑'과 '파란 랩'을 구분할 수 없음.
+        #   흰 뚜껑 : B-R = +79~95,  min(R,G,B) = 113~141
+        #   파란 랩 : B-R = +62~91,  min(R,G,B) =  18~29   <- 어두움
+        # min(R,G,B) 밝기 게이트를 AND 로 걸면 랩만 정확히 제거된다.
+        # (지그/바닥은 밝지만 B-R 이 음수라 1차 이진화에서 이미 걸러짐)
+        # =================================================================
+        if target_color == "white":
+            bright_thr = self.v_config.get("WHITE_MIN_BRIGHTNESS", 90)
+            if bright_thr > 0:
+                min_rgb = np.minimum(np.minimum(R, G), B).astype(np.uint8)
+                _, bright_mask = cv2.threshold(min_rgb, bright_thr, 255, cv2.THRESH_BINARY)
+                binary = cv2.bitwise_and(binary, bright_mask)
+
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+
+        # =================================================================
+        # ★ [white 전용 보강] 뚜껑 위 QR 스티커가 뚫어놓은 구멍 메우기
+        # QR 스티커가 어두워서 뚜껑 blob 이 초승달 모양으로 끊기면
+        # distanceTransform 의 inner_radius 가 뭉개져 반지름 검사에서 탈락함.
+        # =================================================================
+        if target_color == "white":
+            ck = self.v_config.get("WHITE_CLOSE_KSIZE", 25)
+            if ck > 1:
+                binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE,
+                                          cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ck, ck)))
 
         # 3. 윤곽선 찾기
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -152,12 +237,21 @@ class VisionCore:
             return None
             
         # =================================================================
-        # ★ [핵심 1] 화면에서 가장 큰 색상 덩어리 딱 1개만 남기기
-        # 구석에 있는 파란 구조물, 자잘한 반사광 등은 여기서 100% 폐기됩니다.
+        # ★ [핵심 1] 후보 blob 중 1개 선택
+        # 'white' 는 사이트 조명에 따라 구리 지그 반사광이 색상 게이트를
+        # 통과하므로(Area2: 지그 B-R=+40, minRGB=144) '최대 면적' 규칙이
+        # 반사광에 밀린다. 반지름/원형도로 거른 뒤 중앙 최근접으로 고른다.
+        # 그 외 색상은 기존과 동일하게 '가장 큰 blob'.
         # =================================================================
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
-        largest_cnt = contours[0]
-        
+
+        if target_color == "white":
+            largest_cnt = self._select_blob(contours, h, w, scale, qr_xy)
+            if largest_cnt is None:
+                return None
+        else:
+            largest_cnt = contours[0]
+
         area = cv2.contourArea(largest_cnt)
         if area < (math.pi * (min_r ** 2) * 0.2):
             return None # 뚜껑이 아예 없는 빈 바닥인 경우 방어
@@ -315,16 +409,30 @@ class VisionCore:
                 cv2.line(display_img, (cam_cx, cam_cy - 60), (cam_cx, cam_cy + 60), (0, 255, 255), l_thick)
 
                 barcodes = self._read_qr_robust(color_img)
-                circle = self.detect_circle_by_diff(color_img, depth_img, target_color)
 
                 if barcodes:
                     last_qr_data = barcodes[0].text
                     last_qr_pts = np.array([[p.x, p.y] for p in [barcodes[0].position.top_left, barcodes[0].position.top_right, barcodes[0].position.bottom_right, barcodes[0].position.bottom_left]], dtype=np.int32)
                     cv2.polylines(display_img, [last_qr_pts], isClosed=True, color=(255, 0, 255), thickness=l_thick)
 
+                # ★ QR 중심을 원 선택의 앵커로 넘긴다 (QR 은 항상 뚜껑 위에 있음)
+                qr_xy = None
+                if last_qr_pts is not None:
+                    qr_xy = (float(np.mean(last_qr_pts[:, 0])), float(np.mean(last_qr_pts[:, 1])))
+
+                circle = self.detect_circle_by_diff(color_img, depth_img, target_color, qr_xy)
+
                 if circle:
                     cx, cy, cr = circle
-                    if self.ema_x is None: 
+
+                    # ★ QR 을 품지 못한 원은 EMA 에 누적하지 않는다.
+                    # (초기 프레임의 오검출이 EMA(a=0.15)에 섞이면 뒤늦게
+                    #  뚜껑을 제대로 잡아도 최종 중심이 끌려가 버림)
+                    if qr_xy is not None and math.hypot(cx - qr_xy[0], cy - qr_xy[1]) > cr:
+                        print(f"  - 원이 QR 을 벗어남 -> EMA 반영 안 함 ({attempt+1}/30)")
+                        continue
+
+                    if self.ema_x is None:
                         self.ema_x, self.ema_y, self.ema_r = cx, cy, cr
                     else:
                         self.ema_x = self.ALPHA * cx + (1 - self.ALPHA) * self.ema_x

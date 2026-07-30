@@ -308,6 +308,7 @@ class Robot_29999():
     def robot_play(self): return self.send_command_29999("play")
     def robot_pause(self): return self.send_command_29999("pause")
     def robot_stop(self): return self.send_command_29999("stop")
+    def robot_remote_mode_on(self): return self.send_command_29999("remoteControl -on")
     
     def set_robot_speed(self, speed):
         return self.send_command_29999(f"speed -v {speed}")

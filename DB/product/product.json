@@ -74,6 +74,36 @@
                 "cy": 1098.0,
                 "depth": 0.47326587253484836
             }
+        },
+        "22mL_cylinder": {
+            "target_mm": 25.0,
+            "anchor_mm": 25.0,
+            "color": "white",
+            "area1": {
+                "cx": 1962.0,
+                "cy": 1060.0,
+                "depth": 0.40135338730574044
+            },
+            "area2": {
+                "cx": 1902.0,
+                "cy": 1100.0,
+                "depth": 0.45920548276782164
+            }
+        },
+        "1L_gas_marineli": {
+            "target_mm": 166.0,
+            "anchor_mm": 166.0,
+            "color": "white",
+            "area1": {
+                "cx": 1932.0,
+                "cy": 1084.0,
+                "depth": 0.43839339939853805
+            },
+            "area2": {
+                "cx": 1888.0,
+                "cy": 1110.0,
+                "depth": 0.49295558180207216
+            }
         }
     },
     "beaker": {
@@ -85,7 +115,8 @@
             "jig_height_offs": 143,
             "cell_deep_offs": 71,
             "sensing_offs": 300,
-            "grab_offs": 0
+            "grab_offs": 0,
+            "task_path": "/godo_draft8.task"
         },
         "1L_cylinder": {
             "target_mm": 110.0,
@@ -95,7 +126,8 @@
             "jig_height_offs": 156,
             "cell_deep_offs": 0,
             "sensing_offs": 300,
-            "grab_offs": 0
+            "grab_offs": 0,
+            "task_path": "/godo_draft9.task"
         },
         "45mL_charcoal": {
             "target_mm": 60.0,
@@ -105,7 +137,8 @@
             "jig_height_offs": 38,
             "cell_deep_offs": -3,
             "sensing_offs": 300,
-            "grab_offs": 0
+            "grab_offs": 0,
+            "task_path": "/godo_draft8.task"
         },
         "450mL_Marinelli": {
             "target_mm": 131.0,
@@ -115,7 +148,8 @@
             "jig_height_offs": 106,
             "cell_deep_offs": 50,
             "sensing_offs": 300,
-            "grab_offs": 0
+            "grab_offs": 0,
+            "task_path": "/godo_draft8.task"
         },
         "20mL_cylinder": {
             "target_mm": 56.0,
@@ -125,7 +159,30 @@
             "jig_height_offs": 53,
             "cell_deep_offs": 0,
             "sensing_offs": 300,
-            "grab_offs": 0
+            "grab_offs": 0,
+            "task_path": "/godo_draft8.task"
+        },
+        "22mL_cylinder": {
+            "target_mm": 25.0,
+            "anchor_mm": 25.0,
+            "color": "white",
+            "jig_center_offs": 15,
+            "jig_height_offs": 65,
+            "cell_deep_offs": 0,
+            "sensing_offs": 300,
+            "grab_offs": 10,
+            "task_path": "/godo_draft9.task"
+        },
+        "1L_gas_marineli": {
+            "target_mm": 166.0,
+            "anchor_mm": 166.0,
+            "color": "white",
+            "jig_center_offs": 99,
+            "jig_height_offs": 100,
+            "cell_deep_offs": 69,
+            "sensing_offs": 300,
+            "grab_offs": 10,
+            "task_path": "/godo_draft9.task"
         }
     }
 }

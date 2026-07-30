@@ -1,0 +1,41 @@
+[11:15:06.438] DB_PATH :
+[11:15:06.439] D:\RND_WORK\Godo\GoDo_260729\DB\godo_system.db
+[11:15:20.892] [INFO] 시료 비커 모드 선택됨
+[11:15:20.894] [INFO] 로봇 제어 변수 초기화 완료 (오프셋 변수 제외)
+[11:15:21.241] [VISION CWD] 오르벡 로그 경로 강제 지정: D:\RND_WORK\Godo\GoDo_260729\DB\Log\Orrbec
+[11:15:21.241] [VISION] 카메라 네트워크 연결 시도 중 (192.168.1.11)...
+[11:15:21.241] [VISION FATAL] 카메라 연결 실패: VendorTCPClient: Connect to server failed! addr=192.168.1.11, port=8090, err=socket is not ready & timeout
+[11:15:21.243] [DEBUG] 비전 카메라 연결 실패
+[11:15:21.271] [System] 백그라운드 자동 연결 시작...
+[11:15:21.273] [System] 외부 통신 TCP 서버 시작됨 (포트: 5000)...
+[11:15:21.347] Connected to 192.168.227.134 on port 29999
+[11:15:21.349] Connected to 192.168.227.134 on port 30001
+[11:15:21.349] [PC Modbus Client] 로봇 서버(192.168.227.134:502, ID:255)에 코일 통신 연결 시도 중...
+[11:15:21.349] [PC Modbus Client] 로봇 서버 접속 성공!
+[11:15:21.349] [INFO] 로봇 연결 성공 (192.168.227.134)
+[11:15:21.609] [INFO] '1L_cylinder' 오프셋 전송 완료: Center(계산)=65, Height(입력)=156, Deep(입력)=0, Sensing(입력)=300, Grip(입력)=0
+[11:15:21.614] [INFO] '1L_cylinder' 로봇 Task 불러오기 (task -p /godo_draft9.task) -> 응답: Command [task -p] is not supported in local control mode. Please close local control mode first.
+[11:15:35.886] [INFO] '20mL_cylinder' 오프셋 전송 완료: Center(계산)=33, Height(입력)=53, Deep(입력)=0, Sensing(입력)=300, Grip(입력)=0
+[11:15:35.888] [INFO] '20mL_cylinder' 로봇 Task 불러오기 (task -p /godo_draft9.task) -> 응답: Command [task -p] is not supported in local control mode. Please close local control mode first.
+[11:15:35.891] [SYSTEM] 저장할 이전 작업 데이터가 없어 아카이브를 건너뜁니다.
+[11:15:46.169] [INFO] '1L_marineli' 오프셋 전송 완료: Center(계산)=89, Height(입력)=143, Deep(입력)=71, Sensing(입력)=300, Grip(입력)=0
+[11:15:46.172] [INFO] '1L_marineli' 로봇 Task 불러오기 (task -p /godo_draft8.task) -> 응답: Command [task -p] is not supported in local control mode. Please close local control mode first.
+[11:15:46.173] [SYSTEM] 저장할 이전 작업 데이터가 없어 아카이브를 건너뜁니다.
+[11:15:57.010] [SYSTEM] 로봇 원격(Remote) 제어 권한 감지 -> 자동 재연결 시도
+[11:15:57.013] [PC Modbus Client] 접속 종료
+[11:15:57.025] Connected to 192.168.227.134 on port 29999
+[11:15:57.040] Connected to 192.168.227.134 on port 30001
+[11:15:57.041] [PC Modbus Client] 로봇 서버(192.168.227.134:502, ID:255)에 코일 통신 연결 시도 중...
+[11:15:57.057] [PC Modbus Client] 로봇 서버 접속 성공!
+[11:15:57.058] [INFO] 로봇 연결 성공 (192.168.227.134)
+[11:15:57.317] [INFO] '1L_marineli' 오프셋 전송 완료: Center(계산)=89, Height(입력)=143, Deep(입력)=71, Sensing(입력)=300, Grip(입력)=0
+[11:15:57.571] [INFO] '1L_marineli' 로봇 Task 불러오기 (task -p /godo_draft8.task) -> 응답: Loaded task: /home/elite/ELISIM/EliRobot/program/godo_draft8.task
+[11:16:09.615] [INFO] '20mL_cylinder' 오프셋 전송 완료: Center(계산)=33, Height(입력)=53, Deep(입력)=0, Sensing(입력)=300, Grip(입력)=0
+[11:16:09.824] [INFO] '20mL_cylinder' 로봇 Task 불러오기 (task -p /godo_draft9.task) -> 응답: Loaded task: /home/elite/ELISIM/EliRobot/program/godo_draft9.task
+[11:16:09.826] [SYSTEM] 저장할 이전 작업 데이터가 없어 아카이브를 건너뜁니다.
+[11:16:24.039] [INFO] '1L_marineli' 오프셋 전송 완료: Center(계산)=89, Height(입력)=143, Deep(입력)=71, Sensing(입력)=300, Grip(입력)=0
+[11:16:24.229] [INFO] '1L_marineli' 로봇 Task 불러오기 (task -p /godo_draft8.task) -> 응답: Loaded task: /home/elite/ELISIM/EliRobot/program/godo_draft8.task
+[11:16:24.230] [SYSTEM] 저장할 이전 작업 데이터가 없어 아카이브를 건너뜁니다.
+[11:16:36.094] [INFO] '20mL_cylinder' 오프셋 전송 완료: Center(계산)=33, Height(입력)=53, Deep(입력)=0, Sensing(입력)=300, Grip(입력)=0
+[11:16:36.255] [INFO] '20mL_cylinder' 로봇 Task 불러오기 (task -p /godo_draft9.task) -> 응답: Loaded task: /home/elite/ELISIM/EliRobot/program/godo_draft9.task
+[11:16:36.257] [SYSTEM] 저장할 이전 작업 데이터가 없어 아카이브를 건너뜁니다.

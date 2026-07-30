@@ -99,7 +99,11 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PySide6', 'PySide2', 'PyQt6'],
+    excludes=[
+        'PySide6', 'PySide2', 'PyQt6',
+        'fastapi', 'starlette', 'pydantic', 'pydantic_core',
+        'uvicorn', 'tkinter', 'matplotlib', 'scipy'
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

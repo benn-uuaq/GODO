@@ -1363,8 +1363,15 @@ class GODO(QMainWindow):
                 self.set_variable_with_ui("jig_height_offs", jig_height)
                 self.set_variable_with_ui("cell_deep_offs", cell_deep)
                 self.set_variable_with_ui("sensing_offs", sensing)
+                self.set_variable_with_ui("grab_offs", grab)
                 
-                print(f"[INFO] '{beaker_name}' 오프셋 전송 완료: Center(계산)={jig_center}, Height(입력)={jig_height}, Deep(입력)={cell_deep}, Sensing(입력)={sensing}")
+                print(f"[INFO] '{beaker_name}' 오프셋 전송 완료: Center(계산)={jig_center}, Height(입력)={jig_height}, Deep(입력)={cell_deep}, Sensing(입력)={sensing}, Grip(입력)={grab}")
+                
+                task_path = beaker_data.get("task_path", "").strip()
+                if task_path:
+                    task_res = self.robot_29999.send_command_29999(f"task -p {task_path}")
+                    print(f"[INFO] '{beaker_name}' 로봇 Task 불러오기 (task -p {task_path}) -> 응답: {task_res}")
+                    
         except Exception as e:
             print(f"[ERROR] 비커 오프셋 계산 및 전송 실패: {e}")
             
@@ -1743,6 +1750,100 @@ class GODO(QMainWindow):
                 self.connect_robot(show_popup=False)
                 QtCore.QTimer.singleShot(3000, lambda: setattr(self, '_is_reconnecting', False))
 
+    # =========================================================================
+    # ★ 자동 시퀀스 전용 - 요청(Req) 송신 + 응답 없으면 재전송
+    #   증상: Modbus 로 c*_output_job_req 등을 보냈는데 로봇이 작업을 시작하지
+    #         않음(중간에 데이터 유실). req_sent 플래그가 True 로 남아 영구 대기.
+    #   조치: REQ_ACK_TIMEOUT 안에 ing 신호가 안 오면 Req 를 OFF 했다가
+    #         다시 ON. REQ_RETRY_MAX 회까지 반복하고 그래도 안 되면 통신 알람.
+    #   주의: 자동 작업(시퀀스 엔진)에서만 사용. 수동 조작부는 손대지 않음.
+    # =========================================================================
+    REQ_ACK_TIMEOUT = 3.0   # ing 응답 대기 시간 (초)
+    REQ_RETRY_MAX = 5       # 재전송 최대 횟수
+
+    def _req_pulse(self, area, cell, tag, req_vars, acked, pre_vars=None):
+        """
+        반환 True  = 로봇이 요청을 받았음 (호출부에서 Req OFF + 상태 전이)
+        반환 False = 아직 대기 중 (또는 재전송/알람 처리됨)
+        """
+        now = time.time()
+
+        # 이전 사이클에서 이미 통신 알람이 뜬 경우 재시도하지 않음
+        if cell.get("req_failed", False):
+            return False
+
+        # --- 1) 최초 전송 또는 재전송 ---
+        if not cell.get("req_sent", False):
+            for k, v in (pre_vars or []):
+                self.set_variable_with_ui(k, v)
+            for k in req_vars:
+                self.set_variable_with_ui(k, 1)
+
+            cell["req_sent"] = True
+            cell["req_time"] = now
+            cell["req_tag"] = tag
+            n = cell.get("req_retry", 0)
+            suffix = f" [재전송 {n}/{self.REQ_RETRY_MAX}]" if n else ""
+            print(f"[SEQ] 셀 {area} {tag} 요청 전송{suffix} -> 로봇 응답 대기 중...")
+            return False
+
+        # --- 2) 응답 확인 ---
+        if acked:
+            if cell.get("req_retry", 0):
+                print(f"[SEQ] 셀 {area} {tag} 재전송 {cell['req_retry']}회 후 응답 확인됨")
+            cell["req_retry"] = 0
+            return True
+
+        # --- 3) 타임아웃 처리 ---
+        if now - cell.get("req_time", now) < self.REQ_ACK_TIMEOUT:
+            return False
+
+        # Req 를 내려서 로봇 쪽 엣지를 다시 만들어 준다
+        for k in req_vars:
+            self.set_variable_with_ui(k, 0)
+        cell["req_sent"] = False
+        cell["req_retry"] = cell.get("req_retry", 0) + 1
+
+        if cell["req_retry"] > self.REQ_RETRY_MAX:
+            cell["req_retry"] = 0
+            cell["req_failed"] = True          # 호출부에서 상태 정리
+            where = f"셀 {area} " if area else ""
+            msg = (f"{where}{tag} 요청에 로봇이 응답하지 않습니다 "
+                   f"({self.REQ_RETRY_MAX}회 재전송 실패) - Modbus 통신 오류")
+            print(f"[SEQ ERROR] {msg}")
+            self.report_alarm_signal.emit(msg, "ERROR")
+            return False
+
+        print(f"[SEQ WARN] 셀 {area} {tag} {self.REQ_ACK_TIMEOUT}초 내 응답 없음 "
+              f"-> Req OFF 후 재전송 ({cell['req_retry']}/{self.REQ_RETRY_MAX})")
+        return False
+
+    def _arm_home_req(self):
+        """home_req 를 켜고 재전송 워치독을 무장한다 (자동 시퀀스 전용).
+        home_req 는 셀 공용 신호이므로 재시도 상태도 셀 공용으로 하나만 둔다."""
+        self._home_ctx = {"req_sent": True, "req_retry": 0, "req_time": time.time()}
+        self.set_variable_with_ui("home_req", 1)
+
+    def _home_req_watchdog(self):
+        """WAIT_IS_HOME 중인 셀이 있는데 로봇이 homing 을 시작하지 않으면 재전송."""
+        ctx = getattr(self, "_home_ctx", None)
+        if ctx is None:
+            return
+        if not any(self.cell_data[a].get("seq_state") == "WAIT_IS_HOME" for a in [1, 2]):
+            self._home_ctx = None
+            return
+
+        acked = (self.cached_robot_vars.get("homing", 0) == 1
+                 or self.cached_robot_vars.get("is_home", 0) == 1)
+
+        if self._req_pulse(0, ctx, "HOME 복귀", ["home_req"], acked=acked):
+            self._home_ctx = None
+        elif ctx.get("req_failed", False):
+            self._home_ctx = None
+            for a in [1, 2]:
+                if self.cell_data[a].get("seq_state") == "WAIT_IS_HOME":
+                    self.cell_data[a]["seq_state"] = "IDLE"
+
     def poll_robot_state(self):
         if getattr(self, '_is_polling', False): return
         self._is_polling = True
@@ -1990,16 +2091,13 @@ class GODO(QMainWindow):
                     # [Input 투입 시퀀스]
                     # -----------------------------------------------
                     if state == "WAIT_INPUT_START":
-                        if not cell.get("req_sent", False):
-                            curr_pt = cell.get("current_point", 1)
-                            self.set_variable_with_ui(f"J{area}_target_point", curr_pt)
-                            self.set_variable_with_ui(f"c{area}_input_job_req", 1)
-                            cell["req_sent"] = True  
-                            print(f"[SEQ] 셀 {area} INPUT 요청 전송 -> 로봇 출발 응답 대기 중...")
-                        
-                        if ing_in or sensor_arrived:
+                        if self._req_pulse(
+                                area, cell, "INPUT",
+                                [f"c{area}_input_job_req"],
+                                acked=(ing_in or sensor_arrived),
+                                pre_vars=[(f"J{area}_target_point", cell.get("current_point", 1))]):
                             self.set_variable_with_ui(f"c{area}_input_job_req", 0)
-                            cell["req_sent"] = False 
+                            cell["req_sent"] = False
                             cell["seq_state"] = "INPUT_ING"
                             print(f"[DEBUG] 셀 {area} INPUT 출발 인지 완료! -> INPUT_ING 상태 진입")
                             
@@ -2020,22 +2118,23 @@ class GODO(QMainWindow):
                         if in_done:
                             print(f"[SEQ] 셀 {area} 투입 최종 완료 -> Home 복귀")
                             self.set_variable_with_ui("sensor_done", 0)
-                            self.set_variable_with_ui("home_req", 1)
+                            self._arm_home_req()
                             cell["seq_state"] = "WAIT_IS_HOME"
 
                     # -----------------------------------------------
                     # [Output 배출 시퀀스]
                     # -----------------------------------------------
                     elif state == "WAIT_OUTPUT_START":
-                        if not cell.get("req_sent", False):
-                            curr_pt = cell.get("current_point", 1)
-                            self.set_variable_with_ui(f"J{area}_target_point", curr_pt)
-                            self.set_variable_with_ui(f"c{area}_output_job_req", 1)
-                            cell["req_sent"] = True
-                            cell["wait_out_time"] = time.time() # 타임스탬프 기록
-                        
-                        # ★ [방어 3] 과거 잔류 out_done 신호에 속지 않기 위한 0.5초 방어막 추가
-                        if ing_out or (out_done and time.time() - cell.get("wait_out_time", 0) > 0.5):
+                        # ★ [방어 3] 과거 잔류 out_done 신호에 속지 않기 위한 0.5초 방어막 유지
+                        #    (req_time 이 매 재전송마다 갱신되므로 wait_out_time 대체 가능)
+                        acked_out = ing_out or (
+                            out_done and time.time() - cell.get("req_time", 0) > 0.5)
+
+                        if self._req_pulse(
+                                area, cell, "OUTPUT",
+                                [f"c{area}_output_job_req"],
+                                acked=acked_out,
+                                pre_vars=[(f"J{area}_target_point", cell.get("current_point", 1))]):
                             self.set_variable_with_ui(f"c{area}_output_job_req", 0)
                             cell["req_sent"] = False
                             cell["seq_state"] = "OUTPUT_ING"
@@ -2044,23 +2143,20 @@ class GODO(QMainWindow):
                     elif state == "OUTPUT_ING":
                         if out_done:
                             print(f"[SEQ] 셀 {area} 배출 완료 -> Home 복귀")
-                            self.set_variable_with_ui("home_req", 1)
+                            self._arm_home_req()
                             cell["seq_state"] = "WAIT_IS_HOME"
 
                     # -----------------------------------------------
                     # [Calibration 교정 선원 시퀀스]
                     # -----------------------------------------------
                     elif state == "WAIT_CALIB_START":
-                        if not cell.get("req_sent", False):
-                            # 수동 조작부와 동일하게 J=0, input=1, sensor=1 콤보로 쏩니다.
-                            self.set_variable_with_ui(f"J{area}_target_point", 0)
-                            self.set_variable_with_ui(f"c{area}_input_job_req", 1)
-                            self.set_variable_with_ui(f"c{area}_sensor_req", 1)
-                            cell["req_sent"] = True
-                            print(f"[SEQ] 셀 {area} 교정 위치(센서) 이동 지시 발송 -> 출발 대기...")
-                        
+                        # 수동 조작부와 동일하게 J=0, input=1, sensor=1 콤보로 쏩니다.
                         # 로봇이 출발(ing_in)하거나 센서에 도착하면 즉시 요구 신호 OFF (Pulse 구현)
-                        if ing_in or sensor_arrived:
+                        if self._req_pulse(
+                                area, cell, "CALIB",
+                                [f"c{area}_input_job_req", f"c{area}_sensor_req"],
+                                acked=(ing_in or sensor_arrived),
+                                pre_vars=[(f"J{area}_target_point", 0)]):
                             self.set_variable_with_ui(f"c{area}_input_job_req", 0)
                             self.set_variable_with_ui(f"c{area}_sensor_req", 0)
                             cell["req_sent"] = False
@@ -2084,7 +2180,7 @@ class GODO(QMainWindow):
                         if not sensor_arrived:
                             print(f"[SEQ] 셀 {area} 센서 위치 이탈 감지 -> 홈 복귀 요청")
                             self.set_variable_with_ui("sensor_done", 0)
-                            self.set_variable_with_ui("home_req", 1)
+                            self._arm_home_req()
                             cell["seq_state"] = "WAIT_IS_HOME"
 
                     # -----------------------------------------------
@@ -2107,6 +2203,20 @@ class GODO(QMainWindow):
                         if self.ui.calibration_mode_btn.isChecked():
                             print(f"[SEQ] 셀 {area} 교정 작업 완전 종료 -> 프로그램 자동 정지(Stop) 실행")
                             QtCore.QTimer.singleShot(100, self.on_stop_button_clicked)
+
+                # ===========================================================
+                # ★ 요청 재전송 실패(통신 알람) 처리 - 해당 셀 시퀀스 정리
+                # ===========================================================
+                for area in [1, 2]:
+                    c = self.cell_data[area]
+                    if c.get("req_failed", False):
+                        c["req_failed"] = False
+                        c["req_sent"] = False
+                        c["req_retry"] = 0
+                        c["seq_state"] = "IDLE"
+
+                # ★ home_req 는 셀 공용 신호이므로 루프 밖에서 한 번만 감시
+                self._home_req_watchdog()
 
         except Exception as e:
             import traceback
@@ -3083,9 +3193,13 @@ class GODO(QMainWindow):
             for area in [1, 2]:
                 cell = self.cell_data[area]
                 cell["seq_state"] = "IDLE"
-                cell["req_sent"] = False      
-                cell["sensor_arrive_time"] = 0 
-                
+                cell["req_sent"] = False
+                cell["sensor_arrive_time"] = 0
+                # ★ 요청 재전송 상태도 함께 초기화
+                cell["req_retry"] = 0
+                cell["req_failed"] = False
+                cell["req_time"] = 0
+
                 # ========================================================
                 # ★ [핵심 수정] 아래 항목들은 GODO 통신 및 일시정지 복구를 위해 
                 # 절대로 지우지 않고 그대로 보존(Keep)합니다!
@@ -3101,6 +3215,7 @@ class GODO(QMainWindow):
                 self.set_variable_with_ui(f"c{area}_sensor_req", 0)
                 
             # ③ 글로벌 공용 신호 초기화
+            self._home_ctx = None          # ★ home_req 재전송 워치독 해제
             self.set_variable_with_ui("sensor_done", 0)
             self.set_variable_with_ui("home_req", 0)
             self.set_variable_with_ui("system_ng", 0)
