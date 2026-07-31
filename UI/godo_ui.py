@@ -504,11 +504,60 @@ class Ui_MainWindow(object):
 "")
         self.robot_power_on_btn.setObjectName("robot_power_on_btn")
         self.gridLayout.addWidget(self.robot_power_on_btn, 2, 0, 1, 1)
+        # ★ [추가] 개별 작업 명령 (로봇 전원 켜기 / 알람 리셋 아래, 2칸 전체)
+        self.individual_job_btn = QtWidgets.QPushButton(self.groupBox)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.individual_job_btn.sizePolicy().hasHeightForWidth())
+        self.individual_job_btn.setSizePolicy(sizePolicy)
+        self.individual_job_btn.setStyleSheet("#individual_job_btn:enabled {\n"
+"    color: rgb(255, 255, 255);\n"
+"    background-color: #6f42c1;\n"
+"    font: bold 16pt \"Arial\";\n"
+"    border: 1px solid rgb(0, 0, 0);\n"
+"    border-radius: 10px;\n"
+"    border-bottom: 3px solid #5a34a0;\n"
+"    border-right: 3px solid #5a34a0;\n"
+"    margin-top: 4px;                 \n"
+"    margin-bottom: 4px;\n"
+"}\n"
+"#individual_job_btn:hover {\n"
+"    background-color: #5a34a0;\n"
+"    border-radius: 10px;\n"
+"    border-bottom: 3px solid #4b2b85;\n"
+"    border-right: 3px solid #4b2b85;\n"
+"    margin-top: 4px;                 \n"
+"    margin-bottom: 4px;\n"
+"}\n"
+"#individual_job_btn:pressed {\n"
+"    background-color: #4b2b85;\n"
+"    border-radius: 10px;\n"
+"    border-top: 3px solid #3d226c;\n"
+"    border-left: 3px solid #3d226c;\n"
+"    margin-top: 6px;\n"
+"    margin-bottom: 6px;\n"
+"}\n"
+"#individual_job_btn:disabled {\n"
+"    color: #000000;\n"
+"    background-color: #c8c8c8;\n"
+"    font: bold 16pt \"Arial\";\n"
+"    border: 1px solid #000000;\n"
+"    border-radius: 10px;\n"
+"    border-bottom: 3px solid #686868;\n"
+"    border-right: 3px solid #686868;\n"
+"    margin-top: 4px;                 \n"
+"    margin-bottom: 4px;\n"
+"}\n"
+"")
+        self.individual_job_btn.setObjectName("individual_job_btn")
+        self.gridLayout.addWidget(self.individual_job_btn, 3, 0, 1, 2)
         self.gridLayout.setColumnStretch(0, 1)
         self.gridLayout.setColumnStretch(1, 1)
         self.gridLayout.setRowStretch(0, 1)
         self.gridLayout.setRowStretch(1, 1)
         self.gridLayout.setRowStretch(2, 1)
+        self.gridLayout.setRowStretch(3, 1)
         self.gridLayout_4.addWidget(self.groupBox, 0, 1, 1, 1)
         self.groupBox_4 = QtWidgets.QGroupBox(self.widget_2)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
@@ -5353,6 +5402,7 @@ class Ui_MainWindow(object):
         self.calibration_mode_btn.setText(_translate("MainWindow", "교정 선원 모드"))
         self.alarm_reset_btn.setText(_translate("MainWindow", "알람 리셋"))
         self.robot_power_on_btn.setText(_translate("MainWindow", "로봇 전원 켜기"))
+        self.individual_job_btn.setText(_translate("MainWindow", "개별 작업 명령"))
         self.groupBox_4.setTitle(_translate("MainWindow", "작업 관리"))
         self.cell_1_work.setText(_translate("MainWindow", "셀1 목표 작업 수량/번호"))
         self.cell_1_work_goal_label.setText(_translate("MainWindow", "0"))

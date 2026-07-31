@@ -860,8 +860,205 @@ class CellSelectionDialog(QDialog):
         self.selected_cell = cell_num
         self.accept()
 
+class IndividualJobDialog(QDialog):
+    """
+    개별 작업 명령 팝업.
+      ① 투입 / 배출 선택
+      ② 왼쪽(셀1) / 오른쪽(셀2) 선택
+      ③ 지그 1~12 선택
+    '작업 시작' 을 누르면 (action, area, jig) 를 확정한다.
+    수동 조작이 아니라 '자동 작업'이며, 로봇 동작이 끊겼을 때 외부에서
+    꺼내기/넣기만 개별로 지시하기 위한 용도.
+    """
+    JIG_MIN, JIG_MAX = 1, 12
+    PW_MIN_LEN = 4
+
+    def __init__(self, parent=None, expected_pw="0000"):
+        super().__init__(parent)
+        self.action = None      # "input" / "output"
+        self.area = None        # 1 / 2
+        self.jig = None         # 1~12
+        self._expected_pw = expected_pw
+
+        self.setWindowTitle("개별 작업 명령")
+        self.setFixedSize(620, 760)
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setStyleSheet("background-color: #2b2b2b; color: white; border: 2px solid #6f42c1;")
+
+        root = QVBoxLayout()
+        root.setContentsMargins(24, 20, 24, 20)
+        root.setSpacing(10)
+
+        title = QLabel("개별 작업 명령")
+        title.setAlignment(Qt.AlignCenter)
+        title.setStyleSheet("font-size: 20pt; font-weight: bold; border: none; color: #b79bff;")
+        root.addWidget(title)
+
+        self._toggle_groups = {}
+        root.addWidget(self._section("1. 작업 종류",
+                                     [("투입", "input"), ("배출", "output")], "action"))
+        root.addWidget(self._section("2. 셀 위치",
+                                     [("왼쪽 (셀 1)", 1), ("오른쪽 (셀 2)", 2)], "area"))
+        root.addWidget(self._jig_section())
+        root.addWidget(self._password_section())
+
+        self.status_lbl = QLabel("작업 종류 / 셀 / 지그를 모두 선택하세요.")
+        self.status_lbl.setAlignment(Qt.AlignCenter)
+        self.status_lbl.setStyleSheet("font-size: 12pt; border: none; color: #ffc107;")
+        root.addWidget(self.status_lbl)
+
+        btn_row = QHBoxLayout()
+        self.start_btn = QPushButton("작업 시작")
+        self.start_btn.setFixedHeight(62)
+        self.start_btn.setEnabled(False)
+        self.start_btn.setStyleSheet(
+            "QPushButton { background-color: #28a745; font-size: 17pt; font-weight: bold;"
+            " border-radius: 6px; border: none; }"
+            "QPushButton:hover { background-color: #218838; }"
+            "QPushButton:disabled { background-color: #555555; color: #999999; }")
+        self.start_btn.clicked.connect(self._on_start)
+
+        cancel = QPushButton("취 소")
+        cancel.setFixedHeight(62)
+        cancel.setStyleSheet(
+            "QPushButton { background-color: #555555; font-size: 15pt; font-weight: bold;"
+            " border-radius: 6px; border: none; }"
+            "QPushButton:hover { background-color: #777777; }")
+        cancel.clicked.connect(self.reject)
+
+        btn_row.addWidget(self.start_btn, 2)
+        btn_row.addWidget(cancel, 1)
+        root.addLayout(btn_row)
+        self.setLayout(root)
+
+        if self.parent():
+            g = self.parent().geometry()
+            self.move(g.x() + int((g.width() - self.width()) / 2),
+                      g.y() + int((g.height() - self.height()) / 2))
+
+    # -- 공용 위젯 빌더 ----------------------------------------------------
+    def _btn_style(self, on):
+        if on:
+            return ("QPushButton { background-color: #6f42c1; color: white; font-size: 15pt;"
+                    " font-weight: bold; border-radius: 6px; border: 2px solid #b79bff; }")
+        return ("QPushButton { background-color: #3c3c3c; color: #dddddd; font-size: 15pt;"
+                " font-weight: bold; border-radius: 6px; border: 1px solid #555555; }"
+                "QPushButton:hover { background-color: #4a4a4a; }")
+
+    def _section(self, title, options, key):
+        box = QGroupBox(title)
+        box.setStyleSheet("QGroupBox { font-size: 13pt; font-weight: bold; border: 1px solid #555555;"
+                          " border-radius: 6px; margin-top: 10px; padding-top: 10px; }"
+                          "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; }")
+        lay = QHBoxLayout()
+        lay.setContentsMargins(12, 8, 12, 12)
+        buttons = []
+        for label, value in options:
+            b = QPushButton(label)
+            b.setFixedHeight(64)
+            b.setStyleSheet(self._btn_style(False))
+            b.clicked.connect(lambda _, v=value, k=key: self._select(k, v))
+            buttons.append((b, value))
+            lay.addWidget(b)
+        box.setLayout(lay)
+        self._toggle_groups[key] = buttons
+        return box
+
+    def _jig_section(self):
+        box = QGroupBox(f"3. 지그 번호 ({self.JIG_MIN}~{self.JIG_MAX})")
+        box.setStyleSheet("QGroupBox { font-size: 13pt; font-weight: bold; border: 1px solid #555555;"
+                          " border-radius: 6px; margin-top: 10px; padding-top: 10px; }"
+                          "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; }")
+        grid = QGridLayout()
+        grid.setContentsMargins(12, 8, 12, 12)
+        grid.setSpacing(6)
+        buttons = []
+        for i in range(self.JIG_MIN, self.JIG_MAX + 1):
+            b = QPushButton(str(i))
+            b.setFixedHeight(58)
+            b.setStyleSheet(self._btn_style(False))
+            b.clicked.connect(lambda _, v=i: self._select("jig", v))
+            buttons.append((b, i))
+            idx = i - self.JIG_MIN
+            grid.addWidget(b, idx // 4, idx % 4)
+        box.setLayout(grid)
+        self._toggle_groups["jig"] = buttons
+        return box
+
+    def _password_section(self):
+        box = QGroupBox(f"4. 비밀번호 ({self.PW_MIN_LEN}자리 이상)")
+        box.setStyleSheet("QGroupBox { font-size: 13pt; font-weight: bold; border: 1px solid #555555;"
+                          " border-radius: 6px; margin-top: 10px; padding-top: 10px; }"
+                          "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; }")
+        lay = QHBoxLayout()
+        lay.setContentsMargins(12, 8, 12, 12)
+        self.pw_edit = QLineEdit()
+        self.pw_edit.setEchoMode(QLineEdit.Password)
+        self.pw_edit.setFixedHeight(56)
+        self.pw_edit.setAlignment(Qt.AlignCenter)
+        self.pw_edit.setPlaceholderText("비밀번호 입력")
+        self.pw_edit.setStyleSheet(
+            "QLineEdit { background-color: #1e1e1e; color: white; font-size: 18pt;"
+            " border: 1px solid #555555; border-radius: 6px; padding: 4px; }"
+            "QLineEdit:focus { border: 2px solid #b79bff; }")
+        self.pw_edit.textChanged.connect(lambda _: self._refresh())
+        self.pw_edit.returnPressed.connect(self._on_start)
+        lay.addWidget(self.pw_edit)
+        box.setLayout(lay)
+        return box
+
+    def _select(self, key, value):
+        setattr(self, key, value)
+        for b, v in self._toggle_groups[key]:
+            b.setStyleSheet(self._btn_style(v == value))
+        self._refresh()
+
+    def _refresh(self):
+        picked = self.action is not None and self.area is not None and self.jig is not None
+        pw_ok = len(self.pw_edit.text()) >= self.PW_MIN_LEN if hasattr(self, 'pw_edit') else False
+        self.start_btn.setEnabled(picked and pw_ok)
+
+        missing = []
+        if self.action is None: missing.append("작업 종류")
+        if self.area is None: missing.append("셀 위치")
+        if self.jig is None: missing.append("지그 번호")
+        if not pw_ok: missing.append(f"비밀번호 {self.PW_MIN_LEN}자리 이상")
+
+        if not missing:
+            act = "투입" if self.action == "input" else "배출"
+            side = "왼쪽(셀 1)" if self.area == 1 else "오른쪽(셀 2)"
+            self.status_lbl.setStyleSheet("font-size: 13pt; border: none; color: #28a745; font-weight: bold;")
+            self.status_lbl.setText(f"▶ {side} · 지그 {self.jig}번 · {act} 작업")
+        else:
+            self.status_lbl.setStyleSheet("font-size: 12pt; border: none; color: #ffc107;")
+            self.status_lbl.setText("선택 필요: " + ", ".join(missing))
+
+    def _on_start(self):
+        if not (self.action and self.area and self.jig):
+            return
+        if len(self.pw_edit.text()) < self.PW_MIN_LEN:
+            return
+
+        # ★ DB/password/password.txt 값과 비교
+        if self.pw_edit.text() != self._expected_pw:
+            self.pw_edit.clear()
+            self.pw_edit.setFocus()
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Critical)
+            box.setWindowTitle("비밀번호 오류")
+            box.setText("비밀번호가 달라서 작업을 시작할 수 없습니다.")
+            box.setStyleSheet("QLabel { color: white; font-size: 14pt; }"
+                              "QMessageBox { background-color: #2b2b2b; }"
+                              "QPushButton { background-color: #0078D7; color: white;"
+                              " font-size: 13pt; min-width: 90px; min-height: 40px; border-radius: 5px; }")
+            box.exec_()
+            return
+
+        self.accept()
+
+
 class AlarmDialog(QDialog):
-    closed_signal = pyqtSignal() 
+    closed_signal = pyqtSignal()
     def __init__(self, parent=None, is_error=True, msg=""):
         super().__init__(parent)
         self.setWindowModality(Qt.ApplicationModal)
@@ -1219,6 +1416,7 @@ class GODO(QMainWindow):
         self.ui.start_btn.clicked.connect(self.on_start_work_btn_clicked)
         self.ui.robot_power_on_btn.clicked.connect(lambda: self.on_robot_power_on_button_clicked(True))
         self.ui.alarm_reset_btn.clicked.connect(self.robot_alarm_reset_button)
+        self.ui.individual_job_btn.clicked.connect(self.on_individual_job_clicked)
         
         # # 새로 추가된 버튼 연결 (UI 파일에 해당 객체가 있다고 가정)
         # if hasattr(self.ui, 'buzzer_mute_btn'):
@@ -1640,9 +1838,16 @@ class GODO(QMainWindow):
                     print(f"[TCP] 초기화 중 셀 {area} INPUT 예약 접수 (포인트 {next_pos})")
                     return {"area": area, "result": "ok", "result_code": 0, "msg": "로봇 초기화가 완료되면 즉시 시작됩니다."}
 
-                cell["current_point"] = next_pos 
-                self.set_variable_with_ui(f"J{area}_target_point", next_pos)
-                self.set_variable_with_ui(f"c{area}_input_job_req", 1)
+                # ★ [수정] 여기서 req 를 직접 쓰지 않는다.
+                #   기존에는 여기서 req=1 을 쓰고 req_sent 는 False 로 둔 채
+                #   WAIT_INPUT_START 로 보냈다. 그러면 시퀀스 엔진이 '이미 1인 값에'
+                #   또 1을 써서 rising edge 가 생기지 않는다. 로봇이 첫 순간을
+                #   놓치면 영영 트리거되지 않는 구조였다.
+                #   -> 쓰기는 _req_pulse 한 곳에서만 (0 -> 1 엣지 보장)
+                cell["current_point"] = next_pos
+                cell["req_sent"] = False
+                cell["req_retry"] = 0
+                cell["req_failed"] = False
 
                 cell["last_action"] = "input"
                 cell["sample_id"], cell["calib_loc"], cell["beaker_loc"], cell["loc_dev"], cell["calib_depth"], cell["beaker_depth"], cell["depth_dev"] = "", "", "", "", "", "", ""
@@ -1677,8 +1882,12 @@ class GODO(QMainWindow):
                     print(f"[TCP] 초기화 중 셀 {area} OUTPUT 예약 접수 (포인트 {curr_pt})")
                     return {"area": area, "result": "ok", "result_code": 0, "msg": "로봇 초기화가 완료되면 즉시 시작됩니다."}
 
-                self.set_variable_with_ui(f"J{area}_target_point", curr_pt)
-                self.set_variable_with_ui(f"c{area}_output_job_req", 1)
+                # ★ [수정] input 과 동일. req 쓰기는 _req_pulse 한 곳에서만 수행하여
+                #   0 -> 1 rising edge 를 반드시 만들어 준다.
+                cell["current_point"] = curr_pt
+                cell["req_sent"] = False
+                cell["req_retry"] = 0
+                cell["req_failed"] = False
 
                 cell["last_action"] = "output"
                 cell["seq_state"] = "WAIT_OUTPUT_START"
@@ -1691,6 +1900,151 @@ class GODO(QMainWindow):
             
         return {"area": area, "result": "fail", "result_code": 2, "msg": "알 수 없는 action 입니다."}
     
+    # =========================================================================
+    # ★ 개별 작업 명령
+    #   로봇 동작이 중간에 끊겼을 때, GODO 지시를 기다리지 않고 운전자가
+    #   '이 지그만 꺼내기 / 넣기' 를 직접 지시하기 위한 기능.
+    #   수동 조작(manl_move_req)이 아니라 자동 작업 시퀀스를 그대로 태운다.
+    #   -> 투입이면 비전 촬영/측정까지 동일하게 수행되고, DB 기록도 남는다.
+    #   -> 다만 '개별 작업' 표시를 달아서, 홈 복귀 완료 시 robot_stop() 을 보낸다.
+    # =========================================================================
+    def _load_individual_job_password(self):
+        """DB/password/password.txt 에서 비밀번호를 읽는다. 없으면 기본값 0000 으로 생성."""
+        pw_file = DB_PATH / "password" / "password.txt"
+        try:
+            pw_file.parent.mkdir(parents=True, exist_ok=True)
+            if not pw_file.exists():
+                pw_file.write_text("0000", encoding="utf-8")
+                print(f"[개별작업] 비밀번호 파일 생성 (기본값 0000): {pw_file}")
+            pw = pw_file.read_text(encoding="utf-8").strip()
+            return pw if pw else "0000"
+        except Exception as e:
+            print(f"[개별작업] 비밀번호 파일 읽기 실패 -> 기본값 사용: {e}")
+            return "0000"
+
+    def on_individual_job_clicked(self):
+        if getattr(self, 'robot_disconnected', True):
+            self.show_message("개별 작업 명령", "로봇이 연결되어 있지 않습니다.", QMessageBox.Warning)
+            return
+        if not getattr(self, 'auto_mode', False):
+            self.show_message("개별 작업 명령", "자동(Auto) 모드에서만 사용할 수 있습니다.", QMessageBox.Warning)
+            return
+        if getattr(self, 'is_manual_moving', False):
+            self.show_message("개별 작업 명령", "현재 로봇이 이동 중입니다. 완료 후 조작해주세요.", QMessageBox.Warning)
+            return
+
+        busy = ["WAIT_INPUT_START", "INPUT_ING", "VISION_MEASURING", "WAIT_OUTPUT_START",
+                "OUTPUT_ING", "WAIT_IS_HOME", "CALIB_ING", "WAIT_CALIB_EXIT", "WAIT_IN_FINISH"]
+        with self.state_lock:
+            running = [a for a in (1, 2) if self.cell_data[a]["seq_state"] in busy]
+        if running:
+            self.show_message("개별 작업 명령",
+                              f"셀 {running[0]} 이(가) 작업 중입니다.<br>완료 후 다시 시도해 주세요.",
+                              QMessageBox.Warning)
+            return
+
+        # =================================================================
+        # ★ 1단계 - 사전 확인 팝업
+        #   UI 에 입력된 순차/타겟 지그 설정과 충돌할 수 있으므로,
+        #   '전체 작업 리셋' 수행 사실과 선택된 제품을 먼저 확인시킨다.
+        # =================================================================
+        beaker = self.ui.current_beaker.text() or "(미선택)"
+        c1 = self.cell_data[1]
+        c2 = self.cell_data[2]
+        confirm = self.show_message(
+            "개별 작업 명령 - 확인",
+            "<b style='color:#ffc107;'>개별 작업 모드로 들어갑니다.</b><br><br>"
+            f"선택된 제품 : <b style='color:#00e5ff;'>{beaker}</b><br><br>"
+            "<span style='font-size:19px;'>"
+            f"셀 1 : {c1.get('work_mode','')} / 완료 {c1.get('pos',0)}<br>"
+            f"셀 2 : {c2.get('work_mode','')} / 완료 {c2.get('pos',0)}"
+            "</span><br><br>"
+            "<span style='color:#ff6b6b;'>진행하면 <b>전체 작업이 리셋</b>되어<br>"
+            "기존 순차/타겟 지그 진행 상태가 초기화됩니다.</span><br><br>"
+            "제품이 맞는지 확인하셨습니까?",
+            QMessageBox.Warning, QMessageBox.Yes | QMessageBox.No)
+
+        if confirm != QMessageBox.Yes:
+            print("[개별작업] 사전 확인 취소")
+            return
+
+        # =================================================================
+        # ★ 2단계 - 개별 작업 선택 팝업 (비밀번호 확인 포함)
+        # =================================================================
+        dlg = IndividualJobDialog(self, expected_pw=self._load_individual_job_password())
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        self._start_individual_job(dlg.action, dlg.area, dlg.jig)
+
+    def _start_individual_job(self, action, area, jig):
+        side = "왼쪽(셀 1)" if area == 1 else "오른쪽(셀 2)"
+        act_kr = "투입" if action == "input" else "배출"
+        print(f"[개별작업] {side} · 지그 {jig}번 · {act_kr} 명령 접수")
+
+        beaker_name = self.current_beaker_name_cached or self.ui.current_beaker.text()
+
+        # =================================================================
+        # ★ 팝업의 '작업 시작' 이 곧 작업 시작이다.
+        #   미리 자동 작업을 켜둔 채 개입하면 GODO 지시와 섞여 위험하므로,
+        #   여기서 직접 시작시킨다.
+        #   단, on_start_work_btn_clicked() 는 백그라운드 스레드에서
+        #   seq_state 를 IDLE 로 덮어쓰므로 여기서 바로 상태를 심으면 지워진다.
+        #   -> 예약만 걸어두고, 초기화+홈복귀가 끝난 뒤(is_startup_ready)
+        #      시퀀스 엔진이 꺼내 쓰도록 한다.
+        # =================================================================
+        self._pending_individual = {
+            "action": action, "area": area, "jig": jig, "beaker": beaker_name
+        }
+
+        if not getattr(self, 'is_working', False):
+            print("[개별작업] 작업 미시작 상태 -> 개별 작업용으로 '작업 시작' 실행")
+            self.on_start_work_btn_clicked()
+            if not getattr(self, 'is_working', False):
+                # 시작이 거부된 경우(수동모드/연결끊김 등) 예약 취소
+                self._pending_individual = None
+                print("[개별작업] 작업 시작 실패 -> 개별 작업 예약 취소")
+                return
+
+        self.add_alarm_log(f"개별 작업 명령 접수: {side} 지그 {jig}번 {act_kr}", "INFO")
+        QtCore.QMetaObject.invokeMethod(self, "update_ui_state", Qt.QueuedConnection)
+
+    def _apply_pending_individual_job(self):
+        """초기화/홈복귀가 끝나면 예약된 개별 작업을 실제 시퀀스에 투입한다.
+        (state_lock 을 이미 잡은 상태에서 호출할 것)"""
+        job = getattr(self, '_pending_individual', None)
+        if not job or not getattr(self, 'is_startup_ready', False):
+            return
+        if not getattr(self, 'is_working', False):
+            self._pending_individual = None
+            return
+
+        area, jig, action = job["area"], job["jig"], job["action"]
+        cell = self.cell_data[area]
+        if cell["seq_state"] != "IDLE":
+            return   # 아직 이전 동작 정리 중
+
+        self._pending_individual = None
+
+        cell["current_point"] = jig
+        cell["req_sent"] = False
+        cell["req_retry"] = 0
+        cell["req_failed"] = False
+        cell["individual_job"] = True          # ★ 완료 후 작업 정지 대상 표시
+        cell["last_action"] = action
+
+        if action == "input":
+            cell["sample_id"] = ""
+            cell["calib_loc"] = cell["beaker_loc"] = cell["loc_dev"] = ""
+            cell["calib_depth"] = cell["beaker_depth"] = cell["depth_dev"] = ""
+            cell["seq_state"] = "WAIT_INPUT_START"
+            if hasattr(self, 'db_manager'):
+                self.db_manager.insert_new_job(area, jig, job.get("beaker", ""))
+        else:
+            cell["seq_state"] = "WAIT_OUTPUT_START"
+
+        act_kr = "투입" if action == "input" else "배출"
+        print(f"[개별작업] 준비 완료 -> 셀 {area} 지그 {jig}번 {act_kr} 시퀀스 진입")
+
     def poll_remote_status(self):
         """29999포트에 remoteControl -status를 전송하여 원격/로컬 상태 감시"""
         if getattr(self, '_is_polling_remote', False): 
@@ -1774,10 +2128,70 @@ class GODO(QMainWindow):
 
         # --- 1) 최초 전송 또는 재전송 ---
         if not cell.get("req_sent", False):
+            # =============================================================
+            # ★ 태스크가 멈춰 있으면 req 만 써봐야 읽어줄 주체가 없다.
+            #   재시작 순서를 반드시 지킨다:
+            #     ① 잔류 요청 신호 전부 0 으로 초기화
+            #     ② 이번 작업의 target point + req 를 ON
+            #     ③ 그 다음에 play
+            #   play 를 먼저 보내면 로봇이 남아있던 신호를 읽고 엉뚱한 동작을
+            #   시작한다. 그래서 순서가 바뀌면 안 된다.
+            # =============================================================
+            task_running = bool(getattr(self, 'is_task_running', False)) \
+                and not getattr(self, 'robot_disconnected', True)
+
+            if not task_running:
+                now2 = time.time()
+                if now2 - getattr(self, '_last_task_replay', 0) < self.TASK_REPLAY_COOLDOWN:
+                    return False   # 직전 play 의 반영을 기다리는 중
+                self._last_task_replay = now2
+                self._task_replay_count = getattr(self, '_task_replay_count', 0) + 1
+                print(f"[TASK] ★ 태스크 정지 상태에서 셀 {area} {tag} 요청 발생 "
+                      f"-> 재시작 절차 시작 ({self._task_replay_count}/{self.TASK_REPLAY_MAX})")
+                # ① 잔류 신호 초기화 (지금 켤 신호는 제외)
+                self._clear_req_signals_for_restart(keep=tuple(req_vars))
+            else:
+                self._task_replay_count = 0
+
+            # ② 쓰기 - 실제로 로봇에 들어갔는지 확인한다.
+            #   하나라도 실패하면 '보냈다'고 치지 않고 다음 폴링에서 다시 시도.
+            write_ok = True
             for k, v in (pre_vars or []):
-                self.set_variable_with_ui(k, v)
+                if self.set_variable_with_ui(k, v) is False:
+                    write_ok = False
             for k in req_vars:
-                self.set_variable_with_ui(k, 1)
+                # ★ 이미 1로 남아있으면 0으로 내렸다 올려서 rising edge 를 보장한다.
+                if self.cached_robot_vars.get(k, 0) == 1:
+                    print(f"[SEQ] 셀 {area} {tag} '{k}' 가 이미 1 -> 0으로 내렸다 다시 올림 (엣지 생성)")
+                    self.set_variable_with_ui(k, 0)
+                if self.set_variable_with_ui(k, 1) is False:
+                    write_ok = False
+
+            # ③ req 가 확실히 올라간 뒤에만 play
+            if write_ok and not task_running:
+                self._send_play_async(f"셀 {area} {tag} 재시작")
+                if self._task_replay_count >= self.TASK_REPLAY_MAX:
+                    self._task_replay_count = 0
+                    self._last_task_replay = time.time() + 10
+                    msg = (f"로봇 태스크가 정지 상태이며 play {self.TASK_REPLAY_MAX}회 "
+                           f"재시작에도 복구되지 않습니다 (셀 {area} {tag})")
+                    print(f"[TASK ERROR] {msg}")
+                    self.report_alarm_signal.emit(msg, "ERROR")
+
+            if not write_ok:
+                cell["req_retry"] = cell.get("req_retry", 0) + 1
+                if cell["req_retry"] > self.REQ_RETRY_MAX:
+                    cell["req_retry"] = 0
+                    cell["req_failed"] = True
+                    where = f"셀 {area} " if area else ""
+                    msg = (f"{where}{tag} 요청을 로봇에 쓰지 못했습니다 "
+                           f"({self.REQ_RETRY_MAX}회 실패) - Modbus 통신 오류")
+                    print(f"[SEQ ERROR] {msg}")
+                    self.report_alarm_signal.emit(msg, "ERROR")
+                else:
+                    print(f"[SEQ WARN] 셀 {area} {tag} Modbus 쓰기 실패 "
+                          f"-> 재시도 ({cell['req_retry']}/{self.REQ_RETRY_MAX})")
+                return False
 
             cell["req_sent"] = True
             cell["req_time"] = now
@@ -1789,8 +2203,14 @@ class GODO(QMainWindow):
 
         # --- 2) 응답 확인 ---
         if acked:
-            if cell.get("req_retry", 0):
-                print(f"[SEQ] 셀 {area} {tag} 재전송 {cell['req_retry']}회 후 응답 확인됨")
+            # ★ [계측] 요청 -> ing 응답까지 실제 소요 시간을 남긴다.
+            #   REQ_ACK_TIMEOUT(3초)이 적절한지 현장 데이터로 판단하기 위함.
+            latency = now - cell.get("req_time", now)
+            retry_n = cell.get("req_retry", 0)
+            print(f"[SEQ ACK] 셀 {area} {tag} 응답 확인 - 소요 {latency:.2f}s"
+                  + (f", 재전송 {retry_n}회" if retry_n else "")
+                  + (f"  ※ 타임아웃({self.REQ_ACK_TIMEOUT}s)의 "
+                     f"{latency/self.REQ_ACK_TIMEOUT*100:.0f}% 소모" if latency > self.REQ_ACK_TIMEOUT * 0.5 else ""))
             cell["req_retry"] = 0
             return True
 
@@ -1817,6 +2237,84 @@ class GODO(QMainWindow):
         print(f"[SEQ WARN] 셀 {area} {tag} {self.REQ_ACK_TIMEOUT}초 내 응답 없음 "
               f"-> Req OFF 후 재전송 ({cell['req_retry']}/{self.REQ_RETRY_MAX})")
         return False
+
+    # =========================================================================
+    # ★ 로봇 태스크 살아있음 보장
+    #   로봇 태스크(godo_draft*.task)는 사이클(무한 루프) 구조라 원래는 계속
+    #   돌아야 한다. 그런데 인풋 작업을 마치고 아웃풋까지 장시간(약 1만초)
+    #   대기하는 동안 어느 순간 '작업 정지' 상태로 바뀌는 현상이 있다.
+    #   이 상태에서는 Modbus 로 req 를 아무리 정확히 써 넣어도 그 값을 읽어
+    #   실행할 주체가 없으므로 로봇이 아무 반응을 하지 않는다.
+    #   -> is_task_running(30001 수신값)을 보고 멈춰 있으면 play 를 재전송한다.
+    # =========================================================================
+    TASK_REPLAY_COOLDOWN = 2.0   # play 재전송 최소 간격 (초)
+    TASK_REPLAY_MAX = 5          # 연속 재전송 허용 횟수
+
+    # 태스크 재시작 시 먼저 0으로 밀어버릴 요청 신호들
+    #   (오프셋/타겟포인트 같은 '값' 변수는 건드리지 않는다)
+    RESTART_CLEAR_VARS = [
+        "c1_input_job_req", "c2_input_job_req",
+        "c1_output_job_req", "c2_output_job_req",
+        "c1_sensor_req", "c2_sensor_req",
+        "home_req", "sensor_done",
+        "c1_manl_move_req", "c2_manl_move_req",
+        "j1_manl_targ_req", "j2_manl_targ_req",
+        "grip_open", "grip_close",
+        "c1_door_req", "c2_door_req",
+    ]
+
+    def _clear_req_signals_for_restart(self, keep=()):
+        """태스크 재시작 직전, 남아있는 요청 신호를 전부 0으로 내린다.
+        play 순간에 잔류 신호가 있으면 로봇이 엉뚱한 동작을 시작하기 때문."""
+        cleared = []
+        for name in self.RESTART_CLEAR_VARS:
+            if name in keep:
+                continue
+            if self.cached_robot_vars.get(name, 0) != 0:
+                cleared.append(name)
+            self.set_variable_with_ui(name, 0)
+        if cleared:
+            print(f"[TASK] 재시작 전 잔류 신호 초기화: {cleared}")
+
+    def _send_play_async(self, reason=""):
+        """29999 소켓은 최대 10초 블로킹이라 폴링 스레드에서 직접 부르면 UI 가 멈춘다."""
+        def _play():
+            try:
+                if getattr(self, 'is_task_paused', False):
+                    print("[TASK] 일시정지 상태 -> play 로 재개 시도")
+                resp = self.robot_29999.robot_play()
+                print(f"[TASK] play 전송 ({reason}) -> 응답: {resp}")
+            except Exception as e:
+                print(f"[TASK ERROR] play 전송 실패: {e}")
+        threading.Thread(target=_play, daemon=True).start()
+
+    def _send_stop_async(self, reason=""):
+        """29999 소켓 블로킹을 피해 백그라운드로 stop 전송."""
+        def _stop():
+            try:
+                resp = self.robot_29999.robot_stop()
+                print(f"[TASK] stop 전송 ({reason}) -> 응답: {resp}")
+            except Exception as e:
+                print(f"[TASK ERROR] stop 전송 실패: {e}")
+        threading.Thread(target=_stop, daemon=True).start()
+
+    def _task_alive_watchdog(self):
+        """자동 작업 중 태스크가 멈추는 순간을 감지해 '기록만' 한다.
+        여기서 play 를 보내면 안 된다. 보낼 req 가 없는 상태에서 play 하면
+        로봇이 잔류 신호로 엉뚱한 동작을 하기 때문.
+        실제 복구는 다음 req 를 보낼 때 _req_pulse 에서 수행한다."""
+        if not getattr(self, 'is_working', False) or not getattr(self, 'auto_mode', False):
+            return
+        if getattr(self, 'robot_disconnected', True) or self.is_alarm_state():
+            return
+        if getattr(self, 'is_task_running', False):
+            self._task_stopped_since = 0
+            return
+
+        if not getattr(self, '_task_stopped_since', 0):
+            self._task_stopped_since = time.time()
+            print("[TASK WARN] ★ 자동 작업 대기 중 로봇 태스크 정지 감지 "
+                  "-> 다음 작업 요청 시 '신호 초기화 → req ON → play' 순서로 재시작 예정")
 
     def _arm_home_req(self):
         """home_req 를 켜고 재전송 워치독을 무장한다 (자동 시퀀스 전용).
@@ -1879,6 +2377,29 @@ class GODO(QMainWindow):
                                             self.cached_robot_vars[var_name] = val
                                             self.update_robot_var_ui(var_name, val)
                                             
+                        # ===========================================================
+                        # ★ [추가] OUTPUT 레지스터(301~326) 되읽기 검증
+                        #   지금까지 폴링은 INPUT(270~289)만 읽어서, 우리가 쓴
+                        #   요청값이 로봇에 실제로 남아있는지 확인할 방법이 없었다.
+                        #   불일치가 보이면 값이 유실된 것이므로 로그로 드러낸다.
+                        # ===========================================================
+                        if hasattr(self.modbus_client, 'get_all_registers'):
+                            oregs = self.modbus_client.get_all_registers(301, 26)
+                            if isinstance(oregs, list) and len(oregs) == 26:
+                                for addr_str, var_name in self.var_outputs.items():
+                                    if not addr_str.isdigit():
+                                        continue
+                                    idx = int(addr_str) - 301
+                                    if not (0 <= idx < len(oregs)):
+                                        continue
+                                    actual = oregs[idx]
+                                    expected = self.cached_robot_vars.get(var_name)
+                                    if expected is not None and actual != expected:
+                                        print(f"[MODBUS MISMATCH] {var_name}(addr {addr_str}) "
+                                              f"보낸값={expected} 로봇실제값={actual} - 값 유실 의심")
+                                        self.cached_robot_vars[var_name] = actual
+                                        self.update_robot_var_ui(var_name, actual)
+
                         if hasattr(self.modbus_client, 'get_input_register'):
                             in_mask = self.modbus_client.get_input_register(0)   
                             out_mask = self.modbus_client.get_input_register(2)  
@@ -1913,6 +2434,17 @@ class GODO(QMainWindow):
                 else:
                     self.last_data_time = time.time()
                     self.is_robot_power_on = data.is_robot_power_on
+
+                    # ★ [계측] 태스크 실행 상태가 바뀌는 순간을 로그로 남긴다.
+                    #   '언제' 정지로 바뀌는지 알아야 근본 원인을 잡을 수 있다.
+                    _prev_run = getattr(self, 'is_task_running', None)
+                    if _prev_run is not None and _prev_run != data.is_task_running:
+                        _states = [self.cell_data[a].get("seq_state") for a in (1, 2)]
+                        print(f"[TASK STATE] 태스크 실행={_prev_run} -> {data.is_task_running} "
+                              f"| paused={data.is_task_paused} robot_mode={data.robot_mode} "
+                              f"safety={data.safety_mode} | seq={_states} "
+                              f"is_working={getattr(self, 'is_working', False)}")
+
                     self.is_task_running = data.is_task_running
                     self.is_task_paused = data.is_task_paused
                     self.safety_mode = data.safety_mode
@@ -2074,6 +2606,9 @@ class GODO(QMainWindow):
             # ★ 2. 시퀀스 엔진 구동 (단일 루프로 통합!)
             # =======================================================
             with self.state_lock:
+                # ★ 예약된 개별 작업이 있으면 초기화 완료 시점에 투입
+                self._apply_pending_individual_job()
+
                 for area in [1, 2]:
                     cell = self.cell_data[area]
                     state = cell["seq_state"]
@@ -2090,7 +2625,21 @@ class GODO(QMainWindow):
                     # -----------------------------------------------
                     # [Input 투입 시퀀스]
                     # -----------------------------------------------
-                    if state == "WAIT_INPUT_START":
+                    # -----------------------------------------------
+                    # ★ [버그 수정] PENDING_INPUT / PENDING_OUTPUT 은 예약만 되고
+                    #   이를 다시 꺼내는 코드가 어디에도 없어서, 초기화 중 들어온
+                    #   GODO 요청이 영구히 멈춰 있었다. 초기화가 끝나면 진행시킨다.
+                    # -----------------------------------------------
+                    if state in ("PENDING_INPUT", "PENDING_OUTPUT"):
+                        if getattr(self, 'is_startup_ready', False):
+                            cell["req_sent"] = False
+                            cell["req_retry"] = 0
+                            cell["req_failed"] = False
+                            cell["seq_state"] = ("WAIT_INPUT_START" if state == "PENDING_INPUT"
+                                                 else "WAIT_OUTPUT_START")
+                            print(f"[SEQ] 셀 {area} 초기화 완료 -> 예약된 {state} 진행")
+
+                    elif state == "WAIT_INPUT_START":
                         if self._req_pulse(
                                 area, cell, "INPUT",
                                 [f"c{area}_input_job_req"],
@@ -2193,10 +2742,27 @@ class GODO(QMainWindow):
                         
                         if cell["last_action"] == "output":
                             curr_pt = cell.get("current_point", 1)
-                            if hasattr(self, 'db_manager'): 
+                            if hasattr(self, 'db_manager'):
                                 self.db_manager.finish_job(area, curr_pt)
                             self.increment_workload(area)
-                            
+
+                        # =======================================================
+                        # ★ [개별 작업] 홈 복귀까지 끝났으면 로봇 태스크 정지
+                        #   GODO 지시 작업은 계속 이어져야 하므로 stop 하지 않는다.
+                        #   개별 작업은 '이 건 하나만' 수행하는 것이므로 여기서 멈춘다.
+                        # =======================================================
+                        if cell.pop("individual_job", False):
+                            act_kr = "투입" if cell["last_action"] == "input" else "배출"
+                            pt = cell.get("current_point", 1)
+                            print(f"[개별작업] 셀 {area} 지그 {pt}번 {act_kr} 완료 "
+                                  f"-> 홈 복귀 확인, 작업 정지 실행")
+                            self.report_alarm_signal.emit(
+                                f"개별 작업 완료: 셀 {area} 지그 {pt}번 {act_kr} - 작업 정지", "INFO")
+                            # ★ 개별 작업은 이 건 하나로 끝. '작업 정지' 를 그대로 실행해
+                            #   is_working=False + 로봇 stop + 신호 초기화까지 처리한다.
+                            #   (robot_stop 만 보내면 프로그램은 계속 작업 중 상태로 남는다)
+                            QtCore.QTimer.singleShot(100, self.on_stop_button_clicked)
+
                         # =======================================================
                         # ★ 교정 모드 완료 후 '작업 정지' 자동 클릭 처리
                         # =======================================================
@@ -2217,6 +2783,9 @@ class GODO(QMainWindow):
 
                 # ★ home_req 는 셀 공용 신호이므로 루프 밖에서 한 번만 감시
                 self._home_req_watchdog()
+
+                # ★ 태스크 정지 상시 감시 (아웃풋 요청 오기 전에 미리 복구)
+                self._task_alive_watchdog()
 
         except Exception as e:
             import traceback
@@ -3199,6 +3768,7 @@ class GODO(QMainWindow):
                 cell["req_retry"] = 0
                 cell["req_failed"] = False
                 cell["req_time"] = 0
+                cell.pop("individual_job", None)   # ★ 개별 작업 표시도 해제
 
                 # ========================================================
                 # ★ [핵심 수정] 아래 항목들은 GODO 통신 및 일시정지 복구를 위해 
@@ -3718,20 +4288,52 @@ class GODO(QMainWindow):
                 try: send_val = int(float(str_val))
                 except ValueError: send_val = 0
                 
-            if not getattr(self, 'robot_disconnected', True) and getattr(self, 'modbus_client', None) is not None:
+            # =================================================================
+            # ★ [수정] 쓰기 결과를 반드시 확인한다.
+            #   set_register()/set_coil() 은 이미 '쓰기 -> 되읽기 -> 값 비교' 까지
+            #   해서 True/False 를 돌려주고 있었는데, 그 반환값을 버리는 바람에
+            #   로봇에 값이 안 들어가도 프로그램은 '보냈다'고 기록했다.
+            #   (재전송 5회가 전부 허공에 나가도 로그상 정상으로 보였던 원인)
+            #   실패하면 1회 재연결 후 재시도하고, 그래도 안 되면 캐시/UI 를
+            #   갱신하지 않고 False 를 반환한다.
+            # =================================================================
+            if getattr(self, 'robot_disconnected', True) or getattr(self, 'modbus_client', None) is None:
+                print(f"[MODBUS WRITE SKIP] 로봇 미연결 상태 - '{var_name}'={send_val} 전송 안 됨")
+                return False
+
+            def _do_write():
                 with self.modbus_lock:
-                    # 레지스터 쓰기
                     if target_reg_addr is not None:
                         if hasattr(self.modbus_client, 'set_register'):
-                            self.modbus_client.set_register(target_reg_addr, send_val)
-                    
-                    # 물리 IO (코일) 쓰기
+                            return bool(self.modbus_client.set_register(target_reg_addr, send_val))
+                        return False
                     elif target_coil_addr is not None:
                         if hasattr(self.modbus_client, 'write_coil'):
-                            self.modbus_client.write_coil(target_coil_addr, bool(send_val))
+                            return bool(self.modbus_client.write_coil(target_coil_addr, bool(send_val)))
                         elif hasattr(self.modbus_client, 'set_coil'):
-                            self.modbus_client.set_coil(target_coil_addr, bool(send_val))
+                            return bool(self.modbus_client.set_coil(target_coil_addr, bool(send_val)))
+                        return False
+                    # 주소 매핑이 없는 변수(UI 전용 등)는 기존처럼 통과시킨다
+                    return None
 
+            written = _do_write()
+
+            if written is False:
+                addr = target_reg_addr if target_reg_addr is not None else target_coil_addr
+                print(f"[MODBUS WRITE FAIL] '{var_name}'(addr {addr})={send_val} "
+                      f"쓰기/검증 실패 -> 소켓 재연결 후 1회 재시도")
+                if hasattr(self.modbus_client, 'reopen'):
+                    with self.modbus_lock:
+                        self.modbus_client.reopen()
+                written = _do_write()
+
+                if written is False:
+                    print(f"[MODBUS WRITE FAIL] '{var_name}'={send_val} 재시도도 실패 "
+                          f"- 로봇에 값이 전달되지 않았습니다")
+                    self._modbus_write_fail_count = getattr(self, '_modbus_write_fail_count', 0) + 1
+                    return False
+
+            self._modbus_write_fail_count = 0
             self.cached_robot_vars[var_name] = send_val
             self.update_robot_var_ui(var_name, send_val)
             return True

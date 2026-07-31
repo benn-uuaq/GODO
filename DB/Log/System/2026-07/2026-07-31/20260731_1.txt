@@ -1,0 +1,265 @@
+[12:30:34.851] DB_PATH :
+[12:30:34.851] D:\RND_WORK\Godo\GoDo_260731\DB\godo_system.db
+[12:30:49.557] [INFO] 시료 비커 모드 선택됨
+[12:30:49.557] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'system_ng'=0 전송 안 됨
+[12:30:49.559] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'home_req'=0 전송 안 됨
+[12:30:49.559] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c1_sensor_req'=0 전송 안 됨
+[12:30:49.559] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c2_sensor_req'=0 전송 안 됨
+[12:30:49.559] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c1_input_job_req'=0 전송 안 됨
+[12:30:49.559] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c2_input_job_req'=0 전송 안 됨
+[12:30:49.559] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c1_output_job_req'=0 전송 안 됨
+[12:30:49.590] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c2_output_job_req'=0 전송 안 됨
+[12:30:49.590] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'J1_target_point'=0 전송 안 됨
+[12:30:49.590] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'J2_target_point'=0 전송 안 됨
+[12:30:49.590] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'sensor_done'=0 전송 안 됨
+[12:30:49.590] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'qr_done'=0 전송 안 됨
+[12:30:49.592] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'initialize'=0 전송 안 됨
+[12:30:49.592] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c1_manl_move_req'=0 전송 안 됨
+[12:30:49.592] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c2_manl_move_req'=0 전송 안 됨
+[12:30:49.592] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'j1_manl_targ_req'=0 전송 안 됨
+[12:30:49.592] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'j2_manl_targ_req'=0 전송 안 됨
+[12:30:49.592] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'grip_open'=0 전송 안 됨
+[12:30:49.594] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'grip_close'=0 전송 안 됨
+[12:30:49.594] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c1_door_req'=0 전송 안 됨
+[12:30:49.594] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'c2_door_req'=0 전송 안 됨
+[12:30:49.595] [MODBUS WRITE SKIP] 로봇 미연결 상태 - '실린더1 전진'=0 전송 안 됨
+[12:30:49.595] [MODBUS WRITE SKIP] 로봇 미연결 상태 - '실린더1 후진'=0 전송 안 됨
+[12:30:49.595] [MODBUS WRITE SKIP] 로봇 미연결 상태 - '실린더2 전진'=0 전송 안 됨
+[12:30:49.595] [MODBUS WRITE SKIP] 로봇 미연결 상태 - '실린더2 후진'=0 전송 안 됨
+[12:30:49.595] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_5'=0 전송 안 됨
+[12:30:49.595] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_6'=0 전송 안 됨
+[12:30:49.595] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_7'=0 전송 안 됨
+[12:30:49.597] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_8'=0 전송 안 됨
+[12:30:49.597] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_9'=0 전송 안 됨
+[12:30:49.597] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_10'=0 전송 안 됨
+[12:30:49.597] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_11'=0 전송 안 됨
+[12:30:49.597] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_12'=0 전송 안 됨
+[12:30:49.600] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_13'=0 전송 안 됨
+[12:30:49.600] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_Alarm_Reset'=0 전송 안 됨
+[12:30:49.600] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_15'=0 전송 안 됨
+[12:30:49.601] [MODBUS WRITE SKIP] 로봇 미연결 상태 - 'DO_16'=0 전송 안 됨
+[12:30:49.601] [INFO] 로봇 제어 변수 초기화 완료 (오프셋 변수 제외)
+[12:30:49.941] [VISION CWD] 오르벡 로그 경로 강제 지정: D:\RND_WORK\Godo\GoDo_260731\DB\Log\Orrbec
+[12:30:49.942] [VISION] 카메라 네트워크 연결 시도 중 (192.168.1.11)...
+[12:30:49.943] [VISION FATAL] 카메라 연결 실패: VendorTCPClient: Connect to server failed! addr=192.168.1.11, port=8090, err=socket is not ready & timeout
+[12:30:49.943] [DEBUG] 비전 카메라 연결 실패
+[12:30:50.021] [System] 백그라운드 자동 연결 시작...
+[12:30:50.024] [System] 외부 통신 TCP 서버 시작됨 (포트: 5000)...
+[12:30:50.532] Error connecting to 192.168.1.101 on port 29999: timed out
+[12:30:51.036] Error connecting to 192.168.1.101 on port 30001: timed out
+[12:30:51.036] [PC Modbus Client] 로봇 서버(192.168.1.101:502, ID:255)에 코일 통신 연결 시도 중...
+[12:30:51.623] Error sending command: timed out
+[12:30:52.041] [PC Modbus Client] 로봇 서버 접속 실패
+[12:30:52.043] [ERROR] 로봇 연결 실패: 29999 포트 연결 실패
+[12:30:56.657] Error sending command: timed out
+[12:31:01.255] Error sending command: timed out
+[12:31:01.257] Error sending command: timed out
+[12:31:05.864] Error sending command: timed out
+[12:31:05.864] Error sending command: timed out
+[12:31:10.451] Error sending command: timed out
+[12:31:10.453] Error sending command: timed out
+[12:31:15.047] Error sending command: timed out
+[12:31:15.047] Error sending command: timed out
+[12:31:19.650] Error sending command: timed out
+[12:31:19.651] Error sending command: timed out
+[12:31:24.272] Error sending command: timed out
+[12:31:24.273] Error sending command: timed out
+[12:31:28.884] Error sending command: timed out
+[12:31:28.884] Error sending command: timed out
+[12:31:33.524] Error sending command: timed out
+[12:31:33.524] Error sending command: timed out
+[12:31:38.121] Error sending command: timed out
+[12:31:38.122] Error sending command: timed out
+[12:31:42.771] Error sending command: timed out
+[12:31:42.772] Error sending command: timed out
+[12:31:47.378] Error sending command: timed out
+[12:31:47.378] Error sending command: timed out
+[12:31:51.987] Error sending command: timed out
+[12:31:51.989] Error sending command: timed out
+[12:31:56.579] Error sending command: timed out
+[12:31:56.581] Error sending command: timed out
+[12:32:01.181] Error sending command: timed out
+[12:32:01.181] Error sending command: timed out
+[12:32:05.782] Error sending command: timed out
+[12:32:05.784] Error sending command: timed out
+[12:32:10.366] Error sending command: timed out
+[12:32:10.366] Error sending command: timed out
+[12:32:14.957] Error sending command: timed out
+[12:32:14.959] Error sending command: timed out
+[12:32:19.556] Error sending command: timed out
+[12:32:19.557] Error sending command: timed out
+[12:32:24.190] Error sending command: timed out
+[12:32:24.190] Error sending command: timed out
+[12:32:28.780] Error sending command: timed out
+[12:32:28.781] Error sending command: timed out
+[12:32:33.375] Error sending command: timed out
+[12:32:33.376] Error sending command: timed out
+[12:32:37.994] Error sending command: timed out
+[12:32:37.997] Error sending command: timed out
+[12:32:42.561] Error sending command: timed out
+[12:32:42.562] Error sending command: timed out
+[12:32:47.190] Error sending command: timed out
+[12:32:47.192] Error sending command: timed out
+[12:32:51.848] Error sending command: timed out
+[12:32:51.850] Error sending command: timed out
+[12:32:56.444] Error sending command: timed out
+[12:32:56.445] Error sending command: timed out
+[12:33:01.039] Error sending command: timed out
+[12:33:01.039] Error sending command: timed out
+[12:33:05.667] Error sending command: timed out
+[12:33:05.670] Error sending command: timed out
+[12:33:10.306] Error sending command: timed out
+[12:33:10.308] Error sending command: timed out
+[12:33:14.908] Error sending command: timed out
+[12:33:14.908] Error sending command: timed out
+[12:33:19.483] Error sending command: timed out
+[12:33:19.484] Error sending command: timed out
+[12:33:24.094] Error sending command: timed out
+[12:33:24.096] Error sending command: timed out
+[12:33:28.712] Error sending command: timed out
+[12:33:28.713] Error sending command: timed out
+[12:33:33.313] Error sending command: timed out
+[12:33:33.315] Error sending command: timed out
+[12:33:37.938] Error sending command: timed out
+[12:33:37.938] Error sending command: timed out
+[12:33:42.553] Error sending command: timed out
+[12:33:42.555] Error sending command: timed out
+[12:33:47.175] Error sending command: timed out
+[12:33:47.175] Error sending command: timed out
+[12:33:51.807] Error sending command: timed out
+[12:33:51.819] Error sending command: timed out
+[12:33:56.455] Error sending command: timed out
+[12:33:56.456] Error sending command: timed out
+[12:34:01.079] Error sending command: timed out
+[12:34:01.080] Error sending command: timed out
+[12:34:05.673] Error sending command: timed out
+[12:34:05.675] Error sending command: timed out
+[12:34:10.293] Error sending command: timed out
+[12:34:10.301] Error sending command: timed out
+[12:34:14.927] Error sending command: timed out
+[12:34:14.927] Error sending command: timed out
+[12:34:19.504] Error sending command: timed out
+[12:34:19.514] Error sending command: timed out
+[12:34:24.112] Error sending command: timed out
+[12:34:24.116] Error sending command: timed out
+[12:34:28.730] Error sending command: timed out
+[12:34:28.732] Error sending command: timed out
+[12:34:33.345] Error sending command: timed out
+[12:34:33.348] Error sending command: timed out
+[12:34:37.924] Error sending command: timed out
+[12:34:37.927] Error sending command: timed out
+[12:34:42.508] Error sending command: timed out
+[12:34:42.508] Error sending command: timed out
+[12:34:47.106] Error sending command: timed out
+[12:34:47.110] Error sending command: timed out
+[12:34:51.743] Error sending command: timed out
+[12:34:51.750] Error sending command: timed out
+[12:34:56.353] Error sending command: timed out
+[12:34:56.355] Error sending command: timed out
+[12:35:00.969] Error sending command: timed out
+[12:35:00.971] Error sending command: timed out
+[12:35:05.577] Error sending command: timed out
+[12:35:05.591] Error sending command: timed out
+[12:35:10.167] Error sending command: timed out
+[12:35:10.168] Error sending command: timed out
+[12:35:14.804] Error sending command: timed out
+[12:35:14.805] Error sending command: timed out
+[12:35:19.418] Error sending command: timed out
+[12:35:23.987] Error sending command: timed out
+[12:35:23.987] Error sending command: timed out
+[12:35:28.650] Error sending command: timed out
+[12:35:28.652] Error sending command: timed out
+[12:35:33.237] Error sending command: timed out
+[12:35:33.240] Error sending command: timed out
+[12:35:37.846] Error sending command: timed out
+[12:35:37.847] Error sending command: timed out
+[12:35:42.453] Error sending command: timed out
+[12:35:42.455] Error sending command: timed out
+[12:35:47.071] Error sending command: timed out
+[12:35:47.074] Error sending command: timed out
+[12:35:51.671] Error sending command: timed out
+[12:35:51.672] Error sending command: timed out
+[12:35:56.290] Error sending command: timed out
+[12:35:56.292] Error sending command: timed out
+[12:36:00.918] Error sending command: timed out
+[12:36:00.920] Error sending command: timed out
+[12:36:05.550] Error sending command: timed out
+[12:36:05.552] Error sending command: timed out
+[12:36:10.118] Error sending command: timed out
+[12:36:10.119] Error sending command: timed out
+[12:36:14.764] Error sending command: timed out
+[12:36:14.766] Error sending command: timed out
+[12:36:19.374] Error sending command: timed out
+[12:36:19.375] Error sending command: timed out
+[12:36:23.965] Error sending command: timed out
+[12:36:23.965] Error sending command: timed out
+[12:36:28.566] Error sending command: timed out
+[12:36:28.568] Error sending command: timed out
+[12:36:33.140] Error sending command: timed out
+[12:36:33.140] Error sending command: timed out
+[12:36:37.764] Error sending command: timed out
+[12:36:37.765] Error sending command: timed out
+[12:36:42.338] Error sending command: timed out
+[12:36:42.340] Error sending command: timed out
+[12:36:46.932] Error sending command: timed out
+[12:36:46.933] Error sending command: timed out
+[12:36:51.540] Error sending command: timed out
+[12:36:51.543] Error sending command: timed out
+[12:36:56.119] Error sending command: timed out
+[12:36:56.121] Error sending command: timed out
+[12:37:00.712] Error sending command: timed out
+[12:37:00.713] Error sending command: timed out
+[12:37:05.325] Error sending command: timed out
+[12:37:05.328] Error sending command: timed out
+[12:37:09.911] Error sending command: timed out
+[12:37:09.913] Error sending command: timed out
+[12:37:14.525] Error sending command: timed out
+[12:37:14.526] Error sending command: timed out
+[12:37:19.105] Error sending command: timed out
+[12:37:19.107] Error sending command: timed out
+[12:37:23.702] Error sending command: timed out
+[12:37:23.704] Error sending command: timed out
+[12:37:28.308] Error sending command: timed out
+[12:37:28.310] Error sending command: timed out
+[12:37:32.920] Error sending command: timed out
+[12:37:32.921] Error sending command: timed out
+[12:37:37.544] Error sending command: timed out
+[12:37:37.545] Error sending command: timed out
+[12:37:42.138] Error sending command: timed out
+[12:37:42.140] Error sending command: timed out
+[12:37:46.766] Error sending command: timed out
+[12:37:46.766] Error sending command: timed out
+[12:37:51.337] Error sending command: timed out
+[12:37:51.338] Error sending command: timed out
+[12:37:52.411] [UNCAUGHT EXCEPTION]
+[12:37:52.416] Traceback (most recent call last):
+[12:37:52.416] File "C:\Users\user\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyModbusTCP\client.py", line 313, in _open
+    self._sock.connect(sa)
+[12:37:52.416] TimeoutError: timed out
+[12:37:52.416] During handling of the above exception, another exception occurred:
+[12:37:52.416] Traceback (most recent call last):
+[12:37:52.419] File "d:\RND_WORK\Godo\GoDo_260731\godo_main.py", line 2016, in poll_robot_state
+    regs = self.modbus_client.get_all_registers(270, 20)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[12:37:52.419] File "D:\RND_WORK\Godo\GoDo_260731\ROBOT\robot.py", line 551, in get_all_registers
+    regs = self.client.read_holding_registers(start_address, count)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[12:37:52.419] File "C:\Users\user\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyModbusTCP\client.py", line 442, in read_holding_registers
+    rx_pdu = self._req_pdu(tx_pdu=tx_pdu, rx_min_len=3)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[12:37:52.419] File "C:\Users\user\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyModbusTCP\client.py", line 910, in _req_pdu
+    self._send_pdu(tx_pdu)
+[12:37:52.419] File "C:\Users\user\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyModbusTCP\client.py", line 794, in _send_pdu
+    self._open()
+[12:37:52.421] File "C:\Users\user\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyModbusTCP\client.py", line 315, in _open
+    self._sock.close()
+[12:37:52.421] File "C:\Users\user\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 499, in close
+    def close(self):
+[12:37:52.421] KeyboardInterrupt
+[12:37:52.421] Error sending command: timed out
+[12:37:57.035] Error sending command: timed out
+[12:37:57.035] Error sending command: timed out
+[12:38:01.642] Error sending command: timed out
+[12:38:01.644] Error sending command: timed out
+[12:38:06.219] Error sending command: timed out
+[12:38:06.219] Error sending command: timed out

@@ -409,20 +409,50 @@ class Robot_modbus():
 
     def connect(self):
         """메인 스레드/연결 스레드에서 명시적으로 호출하는 연결 함수"""
-        self.client = ModbusClient(host=self.host, port=self.port,timeout=1.0)
+        # ★ auto_open 을 반드시 명시한다.
+        #   pyModbusTCP 0.1.x 는 auto_open 기본값이 False 라서, TCP 세션이 한 번
+        #   끊기면(방화벽/NAT/로봇측 idle timeout) 영원히 복구되지 않고 모든
+        #   읽기/쓰기가 조용히 실패한다. 0.2.x 는 True 지만 버전에 의존하지 않도록
+        #   여기서 못을 박는다. auto_close 는 매 요청마다 소켓을 닫지 않도록 False.
+        try:
+            self.client = ModbusClient(host=self.host, port=self.port, timeout=1.0,
+                                       auto_open=True, auto_close=False)
+        except TypeError:
+            # 아주 오래된 버전 호환
+            self.client = ModbusClient(host=self.host, port=self.port, timeout=1.0)
+            for attr, val in (("auto_open", True), ("auto_close", False)):
+                try:
+                    setattr(self.client, attr, val)
+                except Exception:
+                    pass
+
         print(f"[PC Modbus Client] 로봇 서버({self.host}:{self.port}, ID:255)에 코일 통신 연결 시도 중...")
-        
+
         if self.client.is_open:
             self.client.close()
-            
+
         is_open = self.client.open()
-        
+
         if is_open:
             print("[PC Modbus Client] 로봇 서버 접속 성공!")
             self.is_running = True
             return True
         else:
             print("[PC Modbus Client] 로봇 서버 접속 실패")
+            return False
+
+    def reopen(self):
+        """소켓이 죽었을 때 재연결 시도 (쓰기 실패 복구용)"""
+        try:
+            if self.client is None:
+                return self.connect()
+            try:
+                self.client.close()
+            except Exception:
+                pass
+            return bool(self.client.open())
+        except Exception as e:
+            print(f"[PC Modbus Client] 재연결 실패: {e}")
             return False
 
     def disconnect(self):
