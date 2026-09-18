@@ -46,6 +46,10 @@ from ROBOT.robot import Robot_29999, Robot_30001, AlarmManager, Robot_modbus
 from DB.db import RobotDB
 from VISION.vision_main import VisionCore
 
+# ★ [수정] 모든 로그/알람 앞에 붙는 날짜+시간 포맷
+LOG_TS_FMT = "yyyy-MM-dd HH:mm:ss"
+LOG_TS_FMT_MS = "yyyy-MM-dd HH:mm:ss.zzz"
+
 LOGO_PATH = APP_ROOT / "logo.png"
 DB_PATH = APP_ROOT / "DB"
 CONFIG_PATH = DB_PATH / "config"
@@ -1235,20 +1239,56 @@ class ConnectionThread(QThread):
         self.robot_30001 = robot_30001
         self.modbus_client = modbus_client
 
+    # ★ [수정] 로봇 연결 확인이 끝난 뒤에만 Modbus 에 접속한다.
+    #   기존: 29999 / 30001 / Modbus 를 결과 확인 없이 연달아 접속 시도
+    #   변경: ① 29999 접속 → ② 30001 접속 → ③ 30001 상태 데이터 수신으로
+    #         로봇 응답 확인 → ④ 그 다음에 Modbus(502) 접속
+    #   중간에 실패하면 이미 열어둔 소켓은 닫고 종료한다(다음 재접속 시 누수 방지).
+    ROBOT_CONFIRM_TIMEOUT = 5.0   # 30001 상태 데이터 첫 수신 대기 (초)
+
+    def _cleanup(self):
+        try: self.robot_30001.disconnect_30001()
+        except Exception: pass
+        try: self.robot_29999.disconnect_29999()
+        except Exception: pass
+
     def run(self):
         try:
-            sock1 = self.robot_29999.connect_29999()
-            sock2 = self.robot_30001.connect_30001()
+            # ① 29999 (대시보드)
+            if self.robot_29999.connect_29999() is None:
+                self.finished_signal.emit(False, "29999 포트 연결 실패"); return
+
+            # ② 30001 (상태 데이터)
+            if self.robot_30001.connect_30001() is None:
+                self._cleanup()
+                self.finished_signal.emit(False, "30001 포트 연결 실패"); return
+
+            # ③ 로봇 응답 확인: 30001 에서 정상 상태 패킷이 실제로 들어오는지 확인
+            print("[CONNECT] 로봇 포트 접속 완료 -> 로봇 상태 데이터 수신 확인 중...")
+            confirmed = False
+            deadline = time.time() + self.ROBOT_CONFIRM_TIMEOUT
+            while time.time() < deadline:
+                if self.robot_30001.get_data() is not None:
+                    confirmed = True
+                    break
+                time.sleep(0.1)
+            if not confirmed:
+                self._cleanup()
+                self.finished_signal.emit(
+                    False, f"로봇 상태 데이터 수신 없음 ({self.ROBOT_CONFIRM_TIMEOUT:.0f}초)"); return
+            print("[CONNECT] 로봇 연결 확인 완료 -> Modbus(502) 접속 시작")
+
+            # ④ 로봇 확인 후 Modbus 접속
             modbus_ok = False
             if self.modbus_client is not None:
                 modbus_ok = self.modbus_client.connect()
+            if not modbus_ok:
+                self._cleanup()
+                self.finished_signal.emit(False, "Modbus(502) 연결 실패"); return
 
-            if sock1 is None: self.finished_signal.emit(False, "29999 포트 연결 실패"); return
-            if sock2 is None: self.finished_signal.emit(False, "30001 포트 연결 실패"); return
-            if not modbus_ok: self.finished_signal.emit(False, "Modbus(502) 연결 실패"); return
-            
             self.finished_signal.emit(True, "로봇 시스템 연결 성공")
         except Exception as e:
+            self._cleanup()
             self.finished_signal.emit(False, f"연결 중 예외 발생: {str(e)}")
 
 # =========================================================================
@@ -1382,6 +1422,14 @@ class GODO(QMainWindow):
         
         self.cached_robot_vars = {}
         self.modbus_lock = threading.Lock()
+
+        # ★ [추가] 시작/정지 통신 작업 전용 단일 작업자(FIFO)
+        #   시작/정지 스레드가 동시에 돌면 정지 스레드 마지막의
+        #   init_state = "IDLE" 이 시작 스레드의 "REQ_INIT" 을 덮어써 초기화가
+        #   진행되지 않았다. 누른 순서대로 하나씩 끝까지 실행되도록 직렬화한다.
+        self._seq_job_queue = queue.Queue()
+        threading.Thread(target=self._seq_job_worker, daemon=True).start()
+
         self.create_robot_objects()
         
         # self.update_ui_state()
@@ -2049,6 +2097,10 @@ class GODO(QMainWindow):
         """29999포트에 remoteControl -status를 전송하여 원격/로컬 상태 감시"""
         if getattr(self, '_is_polling_remote', False): 
             return
+        # ★ [수정] 재연결(ConnectionThread) 진행 중에는 29999 폴링을 쉬어서
+        #   연결 스레드와 동시에 29999 에 접속/송신하지 않도록 한다.
+        if hasattr(self, 'conn_thread') and self.conn_thread.isRunning():
+            return
             
         self._is_polling_remote = True
 
@@ -2360,7 +2412,10 @@ class GODO(QMainWindow):
             if self.robot_disconnected:
                 self.robot_status_update()
             
-            if hasattr(self, 'modbus_client') and self.modbus_client is not None:
+            # ★ [수정] 로봇 연결이 확인된 상태에서만 Modbus 폴링
+            #   (연결 전/끊김 상태에서 100ms 마다 502 포트에 접근하지 않도록)
+            if (not self.robot_disconnected and hasattr(self, 'modbus_client')
+                    and self.modbus_client is not None):
                 try:
                     if not hasattr(self, 'var_inputs'): self._load_modbus_config()
                     with self.modbus_lock:
@@ -2476,15 +2531,6 @@ class GODO(QMainWindow):
                 self.robot_status_update()
 
             # =======================================================
-            # ★ [추가] Req 1: 알람 상태에서 Task가 멈춘 것이 확인되면 system_ng OFF
-            # =======================================================
-            if self.cached_robot_vars.get("system_ng", 0) == 1:
-                if not has_error: 
-                    self.set_variable_with_ui("system_ng", 0)
-                # if not getattr(self, 'is_task_running', True):
-                #     self.set_variable_with_ui("system_ng", 0)
-
-            # =======================================================
             # ★ 시작 시퀀스: 초기화 펄스 -> 홈 복귀 -> 완료 확인
             # =======================================================
             current_init_state = getattr(self, 'init_state', "IDLE")
@@ -2581,6 +2627,18 @@ class GODO(QMainWindow):
                     self.auto_mode = auto_enabled
             
             has_error = is_emg or cyl1_alarm or cyl2_alarm
+
+            # =======================================================
+            # ★ [추가] Req 1: 알람 상태에서 Task가 멈춘 것이 확인되면 system_ng OFF
+            # ★ [수정] has_error 가 정의되기 전에 참조되어 system_ng == 1 이면
+            #   매 폴링마다 UnboundLocalError -> 시퀀스 엔진 전체가 건너뛰어지던
+            #   문제 수정. has_error 계산 직후로 위치 이동.
+            # =======================================================
+            if self.cached_robot_vars.get("system_ng", 0) == 1:
+                if not has_error: 
+                    self.set_variable_with_ui("system_ng", 0)
+                # if not getattr(self, 'is_task_running', True):
+                #     self.set_variable_with_ui("system_ng", 0)
             
             # ★ 새로운 알람 발생 시 부저 뮤트 자동 해제 (자동 initialize 송출 로직 제거됨)
             if has_error and getattr(self, 'last_lamp_state', None) != "ALARM":
@@ -2815,8 +2873,7 @@ class GODO(QMainWindow):
         self.set_variable_with_ui("Buzzer", buzz)
 
     def save_tcp_csv(self, msg):
-        now_str = QDateTime.currentDateTime().toString("yyyy-MM-dd HH:mm:ss.zzz")
-        time_only = now_str.split(" ")[1]
+        now_str = QDateTime.currentDateTime().toString(LOG_TS_FMT_MS)
 
         if "📥 [수신]" in msg:
             direction = "수신"
@@ -2830,21 +2887,21 @@ class GODO(QMainWindow):
             return 
             
         if hasattr(self.ui, 'godo_msg_area'):
-            html_msg = f"<span style='color: {msg_color};'>[{time_only}] {msg.strip()}</span>"
+            html_msg = f"<span style='color: {msg_color};'>[{now_str}] {msg.strip()}</span>"
             
             # ★ 핵심: 직접 UI를 건드리지 않고, 방금 만든 대리자(append_godo_msg_safe)에게 위임합니다!
             QtCore.QMetaObject.invokeMethod(self, "append_godo_msg_safe", Qt.QueuedConnection, QtCore.Q_ARG(str, html_msg))
             
         # (파일 저장 로직은 기존과 동일)
         if hasattr(self, 'godo_log_path'):
-            plain_msg = f"[{time_only}] [{direction}] {data}"
+            plain_msg = f"[{now_str}] [{direction}] {data}"
             self.prepend_log_to_txt(self.godo_log_path, plain_msg)
             
     # ★ [신규 추가] Print 출력들을 system_msg_area에 쏴주는 함수
     @pyqtSlot(str)
     def append_system_msg(self, text):
         if hasattr(self.ui, 'system_msg_area'):
-            time_str = QDateTime.currentDateTime().toString("HH:mm:ss.zzz")
+            time_str = QDateTime.currentDateTime().toString(LOG_TS_FMT_MS)
             html_msg = f"<span>[{time_str}] {text.strip()}</span>"
             
             self.safe_append_log(self.ui.system_msg_area, html_msg)
@@ -3010,7 +3067,7 @@ class GODO(QMainWindow):
                 print(f"[DEBUG] 셀 {area} 비전 검사 완료 -> sensor_done ON 송신")
                 self.set_variable_with_ui("sensor_done", 1)
 
-                time_str = QDateTime.currentDateTime().toString("HH:mm:ss")
+                time_str = QDateTime.currentDateTime().toString(LOG_TS_FMT)
                 qr_msg = f"<span style='color: #E040FB;'>[{time_str}] 셀 {area} QR : {qr_data}</span>"
                 if cx != -1:
                     vis_msg = (f"<span style='color: #4CAF50;'>[{time_str}] 셀 {area} 측정 완료<br>"
@@ -3162,7 +3219,8 @@ class GODO(QMainWindow):
             self.update_ui_state()
             
             # 4. 시스템 로그 기록
-            reset_msg = "<span style='color: #FF9800;'>[SYSTEM] 외부 고도(GODO) 요청으로 전체 작업(셀 1, 2) 및 DB 초기화 완료</span>"
+            reset_msg = (f"<span style='color: #FF9800;'>[{QDateTime.currentDateTime().toString(LOG_TS_FMT)}] "
+                         "[SYSTEM] 외부 고도(GODO) 요청으로 전체 작업(셀 1, 2) 및 DB 초기화 완료</span>")
             if hasattr(self.ui, 'system_msg_area'):
                 self.safe_append_log(self.ui.system_msg_area, reset_msg)
             if hasattr(self.ui, 'godo_msg_area'):
@@ -3250,18 +3308,27 @@ class GODO(QMainWindow):
             val_item.setText(display_text)
             
     def create_robot_objects(self):
-        if hasattr(self, 'robot_30001') and self.robot_30001:
-            try: self.robot_30001.__sock.close() 
-            except: pass
-        if hasattr(self, 'robot_29999') and self.robot_29999:
-            try: self.robot_29999.sock.close()
-            except: pass
-        if hasattr(self, 'modbus_client') and self.modbus_client is not None:
-            try: self.modbus_client.disconnect()
-            except: pass
+        # ★ [수정] 재연결 시 이전 소켓(29999 / 30001 / 502)을 전부 확실히 닫는다.
+        #   기존 self.robot_30001.__sock.close() 는 GODO 클래스 안에서
+        #   이름 맹글링(_GODO__sock)으로 AttributeError -> 조용히 무시되어
+        #   30001 소켓이 한 번도 닫히지 않았다. 클래스의 공개 종료 함수를 사용한다.
+        #   (끊김 판정 시점이 아니라 여기서 닫는 이유: 끊김 상태에서도 원격 모드
+        #    복귀 감시를 위해 29999 는 계속 쓰이므로, 새 객체로 교체하는 시점이
+        #    '확실히 안 쓰는' 시점이다.)
+        if getattr(self, 'robot_30001', None) is not None:
+            try: self.robot_30001.disconnect_30001()
+            except Exception: pass
+        if getattr(self, 'robot_29999', None) is not None:
+            try: self.robot_29999.disconnect_29999()
+            except Exception: pass
+        # Modbus 는 다른 스레드가 쓰기/읽기 도중일 수 있으므로 락 안에서 닫고 교체
+        with self.modbus_lock:
+            if getattr(self, 'modbus_client', None) is not None:
+                try: self.modbus_client.disconnect()
+                except Exception: pass
+            self.modbus_client = Robot_modbus(host=self.robot_ip, port=self.modbus_port)
         self.robot_30001 = Robot_30001(self.robot_ip, self.robot_port2)
         self.robot_29999 = Robot_29999(self.robot_ip, self.robot_port1)
-        self.modbus_client = Robot_modbus(host=self.robot_ip, port=self.modbus_port)
 
     def start_background_connection(self):
         print("[System] 백그라운드 자동 연결 시작...")
@@ -3402,6 +3469,13 @@ class GODO(QMainWindow):
                 self.ui.inspection_mode_btn.blockSignals(False)
     
     def reset_all_robot_variables(self):
+        # ★ [수정] 로봇 연결 확인 전에는 Modbus 쓰기를 시도하지 않는다.
+        #   프로그램 시작 시 inspection_mode_btn.setChecked(True) 가
+        #   on_inspection_mode_toggled -> 이 함수를 호출하는데, 이 시점은
+        #   로봇 접속 전이라 수십 개 변수에 대해 쓰기 시도(SKIP)가 먼저 발생했다.
+        if getattr(self, 'robot_disconnected', True):
+            print("[INFO] 로봇 미연결 상태 - 제어 변수 초기화(Modbus 쓰기) 생략")
+            return
         try:
             config_path = ROBOT_PATH / "robot_var_config.json"
             if config_path.exists():
@@ -3501,7 +3575,7 @@ class GODO(QMainWindow):
  
     @pyqtSlot(str, str)
     def add_alarm_log(self, message, level="INFO"):
-        time_str = QDateTime.currentDateTime().toString("HH:mm:ss")
+        time_str = QDateTime.currentDateTime().toString(LOG_TS_FMT)
         
         if level == "ERROR":
             # self.set_variable_with_ui("system_ng", 1)
@@ -3620,6 +3694,18 @@ class GODO(QMainWindow):
                 self.ui.robot_state_label.setText(state_text)
         except Exception: pass
 
+    def _seq_job_worker(self):
+        """시작/정지 작업을 요청된 순서대로 하나씩 실행하는 전용 스레드"""
+        while True:
+            name, fn = self._seq_job_queue.get()
+            try:
+                fn()
+            except Exception as e:
+                print(f"[SEQ JOB ERROR] {name}: {e}")
+
+    def _enqueue_seq_job(self, name, fn):
+        self._seq_job_queue.put((name, fn))
+
     @pyqtSlot()
     def on_stop_button_clicked(self):
         print("[CMD] 정지 (Stop) 버튼 클릭됨")
@@ -3656,8 +3742,8 @@ class GODO(QMainWindow):
             finally:
                 self.pause_event.set() # 내부 스레드 락 해제 보장
 
-        # 비서에게 통신 지시
-        threading.Thread(target=_stop_sequence_thread, daemon=True).start()
+        # ★ [수정] 별도 스레드 대신 직렬 작업자에 등록 (시작/정지 중첩 방지)
+        self._enqueue_seq_job("STOP", _stop_sequence_thread)
 
 
     def on_start_work_btn_clicked(self):
@@ -3698,13 +3784,21 @@ class GODO(QMainWindow):
         self.robot_status_update() # 시작 버튼 끄고, 정지 버튼 켜고, 텍스트 파란색 변경
         QApplication.processEvents() # 바뀐 UI 상태를 강제로 즉시 화면에 렌더링!
         
-        self.hard_reset_all_sequences()
+        # ★ [수정] hard_reset_all_sequences() 는 Modbus 쓰기 십수 건이라
+        #   메인 스레드에서 돌리면 (정지 작업과 state_lock 경합 시) UI 가 멈춘다.
+        #   아래 작업자 안으로 이동해 정지 작업이 끝난 뒤 순서대로 실행한다.
 
         # =======================================================
         # ★ 2. 무거운 통신(Modbus) 작업은 백그라운드 스레드로 던짐
         # =======================================================
         def _start_sequence_thread():
             try:
+                # ★ 대기 중에 정지가 눌렸다면(이후 요청이 우선) 시작하지 않는다.
+                if not self.is_working:
+                    print("[CMD] 시작 요청 취소됨 (이후 정지 요청이 들어옴)")
+                    return
+                self.hard_reset_all_sequences()
+
                 # 완료 배열 청소
                 for area in [1, 2]:
                     cell = self.cell_data[area]
@@ -3753,8 +3847,8 @@ class GODO(QMainWindow):
             except Exception as e:
                 print(f"[START ERROR] 로봇 명령 전송 실패: {e}")
 
-        # 비서에게 통신 지시
-        threading.Thread(target=_start_sequence_thread, daemon=True).start()
+        # ★ [수정] 별도 스레드 대신 직렬 작업자에 등록 (정지 작업이 끝난 뒤 실행)
+        self._enqueue_seq_job("START", _start_sequence_thread)
         
     def hard_reset_all_sequences(self):
         """프로그램의 모든 작업 기억과 로봇의 신호를 완전히 강제 초기화합니다."""
@@ -4320,11 +4414,22 @@ class GODO(QMainWindow):
 
             if written is False:
                 addr = target_reg_addr if target_reg_addr is not None else target_coil_addr
-                print(f"[MODBUS WRITE FAIL] '{var_name}'(addr {addr})={send_val} "
-                      f"쓰기/검증 실패 -> 소켓 재연결 후 1회 재시도")
-                if hasattr(self.modbus_client, 'reopen'):
-                    with self.modbus_lock:
-                        self.modbus_client.reopen()
+                # ★ [수정] 실패 원인에 따라 처리 분리
+                #   - "verify": 통신은 정상인데 되읽은 값이 다름(로봇이 값을 바꿈)
+                #               -> TCP 를 끊을 이유가 없음. 재연결 없이 1회 재기록만.
+                #   - "comm"  : 실제 통신 실패 -> 소켓 재연결 후 1회 재시도
+                #   기존에는 검증 불일치까지 매번 재연결해서, 시작/정지 때마다
+                #   502 연결을 여러 번 끊었다 다시 여는 일이 반복됐다.
+                reason = getattr(self.modbus_client, 'last_error', None)
+                if reason == "verify":
+                    print(f"[MODBUS VERIFY FAIL] '{var_name}'(addr {addr})={send_val} "
+                          f"되읽기 값 불일치 -> 재연결 없이 1회 재기록")
+                else:
+                    print(f"[MODBUS WRITE FAIL] '{var_name}'(addr {addr})={send_val} "
+                          f"통신 실패 -> 소켓 재연결 후 1회 재시도")
+                    if hasattr(self.modbus_client, 'reopen'):
+                        with self.modbus_lock:
+                            self.modbus_client.reopen()
                 written = _do_write()
 
                 if written is False:

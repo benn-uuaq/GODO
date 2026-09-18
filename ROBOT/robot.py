@@ -3,6 +3,7 @@ import socket
 import select
 import time
 import queue
+import threading
 
 from pyModbusTCP.client import ModbusClient
 
@@ -261,44 +262,114 @@ class AlarmManager:
             del self.active_alarms[key]
 
 class Robot_29999():
+    """
+    ★ [수정] 29999(대시보드) 소켓 공유 문제 해결
+      기존: 여러 스레드(원격상태 폴링 1.5초, 시작/정지, play, 속도, task -p,
+            리셋 스레드)가 락 없이 같은 소켓에 send -> recv(4096) 를 호출.
+            한 번 응답이 어긋나면(늦게 온 응답이 버퍼에 남는 등) 이후 모든
+            명령이 '직전 명령의 응답'을 읽는 상태가 소켓을 새로 열 때까지 지속.
+      변경: ① RLock 으로 '송신~수신' 한 쌍을 원자적으로 처리
+            ② 송신 직전에 버퍼에 남은 잔여 응답을 비움(어긋남 원천 차단)
+            ③ 응답 타임아웃/오류 시 소켓을 닫아 늦게 온 응답이 다음 명령을
+               오염시키지 못하게 함(다음 호출 때 새로 접속)
+            ④ 접속도 같은 락 안에서 처리 -> 재연결 중 중복 접속 방지
+    """
+    RESP_TIMEOUT = 10.0      # 첫 응답 대기 최대 시간 (초)
+    RESP_IDLE_GAP = 0.08     # 여러 줄 응답(status 등) 수신 시 추가 데이터 대기 간격 (초)
+
     def __init__(self, ip, port1):
         self.sock = None
         self.ip = ip
         self.port1 = port1
+        self._lock = threading.RLock()
 
+    # ---------------- 내부 유틸 (락 보유 상태에서만 호출) ----------------
+    def _close_nolock(self):
+        if self.sock is not None:
+            try: self.sock.close()
+            except Exception: pass
+        self.sock = None
+
+    def _drain_nolock(self):
+        """송신 전, 이전 명령의 늦은 응답 등 잔여 데이터를 모두 버린다."""
+        dropped = 0
+        while True:
+            readable, _, _ = select.select([self.sock], [], [], 0)
+            if not readable:
+                break
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                raise ConnectionError("29999 socket closed by robot")
+            dropped += len(chunk)
+        if dropped:
+            print(f"[29999] 이전 응답 잔여 데이터 {dropped} bytes 폐기 (응답 어긋남 방지)")
+
+    def _recv_response_nolock(self, timeout):
+        """첫 데이터는 timeout 까지 기다리고, 이후 RESP_IDLE_GAP 동안 추가 데이터가
+        없으면 응답 완료로 본다. (status 처럼 여러 줄 응답도 한 번에 받기 위함)"""
+        readable, _, _ = select.select([self.sock], [], [], timeout)
+        if not readable:
+            raise socket.timeout("29999 response timeout")
+        buf = self.sock.recv(4096)
+        if not buf:
+            raise ConnectionError("29999 socket closed by robot")
+        while True:
+            readable, _, _ = select.select([self.sock], [], [], self.RESP_IDLE_GAP)
+            if not readable:
+                break
+            more = self.sock.recv(4096)
+            if not more:
+                break
+            buf += more
+        return buf.decode("utf-8", errors="replace")
+
+    # ---------------- 공개 API ----------------
     def connect_29999(self):
-        try:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.sock.settimeout(0.5)
-            self.sock.connect((self.ip, self.port1))
-            self.sock.settimeout(10.0)
-            print(f"Connected to {self.ip} on port {self.port1}")
+        with self._lock:
+            # 다른 스레드가 이미 접속해 두었다면 그대로 사용 (중복 접속 방지)
+            if self.sock is not None:
+                return self.sock
+            s = None
             try:
-                self.sock.recv(4096) 
-            except Exception:
-                pass
-            return self.sock
-        except Exception as e:
-            print(f"Error connecting to {self.ip} on port {self.port1}: {e}")
-            return None
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.5)
+                s.connect((self.ip, self.port1))
+                s.settimeout(self.RESP_TIMEOUT)
+                self.sock = s
+                print(f"Connected to {self.ip} on port {self.port1}")
+                # 접속 환영 메시지 수신 (없으면 1초 후 통과, 잔여분은 다음 송신 전 폐기)
+                try:
+                    self._recv_response_nolock(1.0)
+                except Exception:
+                    pass
+                return self.sock
+            except Exception as e:
+                print(f"Error connecting to {self.ip} on port {self.port1}: {e}")
+                if s is not None:
+                    try: s.close()
+                    except Exception: pass
+                self.sock = None
+                return None
 
     def send_command_29999(self, command):
-        try:
+        with self._lock:
             if self.sock is None:
                 if self.connect_29999() is None:
                     print("[WARN] 29999 not connected; cannot send command")
-                    return
-            self.sock.sendall(f"{command}\n".encode("utf-8"))
-            response = self.sock.recv(4096).decode("utf-8").strip()
-            return response
-        except Exception as e:
-            print(f"Error sending command: {e}")
-            return None
+                    return None
+            try:
+                self._drain_nolock()
+                self.sock.sendall(f"{command}\n".encode("utf-8"))
+                return self._recv_response_nolock(self.RESP_TIMEOUT).strip()
+            except Exception as e:
+                # 응답이 늦게 도착해 다음 명령을 오염시키지 않도록 소켓을 닫는다.
+                print(f"Error sending command '{command}': {e} -> 29999 소켓 재접속 예정")
+                self._close_nolock()
+                return None
 
     def disconnect_29999(self):
-        if self.sock:
-            self.sock.close()
-            self.sock = None
+        with self._lock:
+            self._close_nolock()
 
     def robot_mode(self): return self.send_command_29999("robotMode")
     def robot_status(self): return self.send_command_29999("status")
@@ -406,9 +477,18 @@ class Robot_modbus():
         self.port = port
         self.client = None
         self.is_running = False
+        # ★ [추가] 마지막 쓰기 실패 원인: None / "comm"(통신 실패) / "verify"(되읽기 값 불일치)
+        #   호출부가 '재연결이 필요한 실패'인지 구분할 수 있도록 한다.
+        self.last_error = None
 
     def connect(self):
         """메인 스레드/연결 스레드에서 명시적으로 호출하는 연결 함수"""
+        # ★ [수정] 같은 객체에서 connect() 를 다시 부르면 이전 클라이언트 소켓을
+        #   닫지 않은 채 새 객체로 덮어써 연결이 남는 문제 방지
+        if self.client is not None:
+            try: self.client.close()
+            except Exception: pass
+            self.client = None
         # ★ auto_open 을 반드시 명시한다.
         #   pyModbusTCP 0.1.x 는 auto_open 기본값이 False 라서, TCP 세션이 한 번
         #   끊기면(방화벽/NAT/로봇측 idle timeout) 영원히 복구되지 않고 모든
@@ -456,7 +536,9 @@ class Robot_modbus():
             return False
 
     def disconnect(self):
-        self.client.close()
+        if self.client is not None:
+            try: self.client.close()
+            except Exception: pass
         self.is_running = False
         print("[PC Modbus Client] 접속 종료")
 
@@ -465,6 +547,10 @@ class Robot_modbus():
     # =========================================================================
     def set_coil(self, address, value):
         """코일 쓰기 (다중 쓰기 지원 - FC 15) 및 코일 읽기(FC 02)를 통한 검증"""
+        self.last_error = None
+        if self.client is None:
+            self.last_error = "comm"
+            return False
         write_bool = str(value).strip().lower() in ['true', '1']
         write_data = 1 if write_bool else 0
         
@@ -473,6 +559,7 @@ class Robot_modbus():
         
         if not is_success:
             print(f"[Modbus Error] 코일 {address}번 쓰기 명령 통신 실패 (연결 끊김 또는 주소 오류)")
+            self.last_error = "comm"
             return False
             
         import time
@@ -491,9 +578,11 @@ class Robot_modbus():
                 return True
         else:
             print(f"[Modbus Error] 코일 {address}번 쓰기 후 읽기(검증) 실패 - 응답 없음")
+            self.last_error = "comm"
             return False
 
     def get_all_coils(self, start_address, count) -> list:
+        if self.client is None: return []
         # 마찬가지로 FC 02 사용
         bits = self.client.read_discrete_inputs(start_address, count)
         if bits:
@@ -501,6 +590,7 @@ class Robot_modbus():
         return []
     
     def get_coil(self, address) -> bool:
+        if self.client is None: return False
         result = self.client.read_discrete_inputs(address, 1)
         if result and len(result) > 0:
             return result[0]
@@ -511,6 +601,10 @@ class Robot_modbus():
     # =========================================================================
     def set_register(self, address, value):
         """Holding Register 단일 쓰기 (FC 06) 및 검증 (FC 03)"""
+        self.last_error = None
+        if self.client is None:
+            self.last_error = "comm"
+            return False
         try:
             write_data = int(float(value))
         except ValueError:
@@ -525,6 +619,7 @@ class Robot_modbus():
         
         if not is_success:
             print(f"[Modbus Error] 레지스터 {address}번 쓰기 명령 통신 실패")
+            self.last_error = "comm"
             return False
             
         import time
@@ -541,13 +636,18 @@ class Robot_modbus():
             if write_data == signed_read_val:
                 return True
             else:
+                # ★ 통신은 정상 - 로봇 쪽에서 값이 바뀐 것. 재연결 대상이 아님.
+                print(f"[Modbus Warn] 레지스터 {address}번 검증 불일치 - 보낸값: {write_data}, 읽은값: {signed_read_val}")
+                self.last_error = "verify"
                 return False
         else:
             print(f"[Modbus Error] 레지스터 {address}번 쓰기 후 읽기(검증) 실패 - 응답 없음")
+            self.last_error = "comm"
             return False
 
     def get_all_registers(self, start_address, count) -> list:
         """Holding Register 여러 개 한 번에 읽기 (FC 03)"""
+        if self.client is None: return []
         regs = self.client.read_holding_registers(start_address, count)
         if regs:
             # ★ [수정 3] 로봇 상태를 통째로 읽어올 때도 모두 Signed(음수 허용) 값으로 변환하여 반환
@@ -556,6 +656,7 @@ class Robot_modbus():
     
     def get_register(self, address) -> int:
         """Holding Register 단일 읽기 (FC 03)"""
+        if self.client is None: return 0
         result = self.client.read_holding_registers(address, 1)
         if result and len(result) > 0:
             val = result[0]
@@ -572,6 +673,7 @@ class Robot_modbus():
         16bit 비트마스크 형태로 요청합니다. 
         유실되었던 원본 로봇 코드의 비트마스크 압축(Packing) 로직을 완벽히 복원합니다.
         """
+        if self.client is None: return -1
         try:
             # 1. 요청 주소에 따라 읽어올 코일의 시작 번호 지정
             if address == 0:
